@@ -3,83 +3,211 @@ import { useState, useEffect } from 'react';
 
 export default function Admin(){
   const [products, setProducts] = useState([]);
-  const [isAuth, setIsAuth] = useState(false);
-  const [pass, setPass] = useState('');
+  const [name, setName] = useState('');
+  const [price, setPrice] = useState('');
+  const [oldPrice, setOldPrice] = useState('');
+  const [delivery, setDelivery] = useState('Logs will be delivered after purchase. Check My Orders');
+  const [img, setImg] = useState('');
+  const [logsText, setLogsText] = useState('');
+  const [previewCount, setPreviewCount] = useState(0);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [passInput, setPassInput] = useState('');
+  // EDIT STATES
   const [editingId, setEditingId] = useState(null);
-  const [newForm, setNewForm] = useState({name:'',price:'',stock:'10',img:'',delivery:''});
-  const [editForm, setEditForm] = useState({name:'',price:'',stock:'',img:'',delivery:''});
+  const [editName, setEditName] = useState('');
+  const [editPrice, setEditPrice] = useState('');
+  const [editOldPrice, setEditOldPrice] = useState('');
+  const [editDelivery, setEditDelivery] = useState('');
+  const [editImg, setEditImg] = useState('');
+  const [editLogsText, setEditLogsText] = useState('');
+  const [editPreviewCount, setEditPreviewCount] = useState(0);
+
+  const ADMIN_PASS = "razzy123";
 
   useEffect(()=>{
-    const s = localStorage.getItem("razzy_products");
-    if(s){ try{ setProducts(JSON.parse(s)); }catch{} }
+    try{
+      const s = localStorage.getItem("razzy_products");
+      if(s) setProducts(JSON.parse(s));
+    }catch{}
   },[]);
-  useEffect(()=>{ localStorage.setItem("razzy_products", JSON.stringify(products)); },[products]);
 
-  const handleImg = (e, setter) => {
+  const saveProducts = (newProducts) => {
+    setProducts(newProducts);
+    localStorage.setItem("razzy_products", JSON.stringify(newProducts));
+  };
+
+  const parseLogs = (text) => {
+    if(!text.trim()) return [];
+    const blocks = text.split(/\n\s*\n/).filter(b=>b.trim().length>3);
+    let finalBlocks = blocks;
+    if(blocks.length <=1 && text.toLowerCase().includes("username")){
+      finalBlocks = text.split(/(?=Username\s*:-)/i).filter(b=>b.trim());
+    }
+    return finalBlocks.map(b=>b.trim()).filter(b=>b);
+  };
+
+  useEffect(()=>{
+    setPreviewCount(parseLogs(logsText).length);
+  },[logsText]);
+
+  useEffect(()=>{
+    setEditPreviewCount(parseLogs(editLogsText).length);
+  },[editLogsText]);
+
+  const handleImageUpload = (e) => {
     const file = e.target.files[0];
     if(!file) return;
+    if(file.size > 2*1024*1024) return alert("Image too big, max 2MB");
     const reader = new FileReader();
-    reader.onload = (ev) => { setter(prev=>({...prev, img: ev.target.result})); };
+    reader.onload = (ev) => setImg(ev.target.result);
     reader.readAsDataURL(file);
   };
 
-  if(!isAuth){
+  const handleEditImageUpload = (e) => {
+    const file = e.target.files[0];
+    if(!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => setEditImg(ev.target.result);
+    reader.readAsDataURL(file);
+  };
+
+  const handleAddProduct = () => {
+    if(!name ||!price) return alert("Enter Name and Price");
+    if(!img) return alert("Upload Picture");
+    const logsArray = parseLogs(logsText);
+    if(logsArray.length===0) return alert("Paste at least 1 log");
+
+    const newProduct = {
+      id: Date.now(),
+      name, price: Number(price), oldPrice: oldPrice? Number(oldPrice) : null,
+      img, stock: logsArray.length, logs: logsArray, delivery, type:'digital'
+    };
+    saveProducts([newProduct,...products]);
+    alert(`Added! ${logsArray.length} accounts`);
+    setName(''); setPrice(''); setOldPrice(''); setImg(''); setLogsText('');
+  };
+
+  const startEdit = (p) => {
+    setEditingId(p.id);
+    setEditName(p.name);
+    setEditPrice(String(p.price));
+    setEditOldPrice(p.oldPrice? String(p.oldPrice) : '');
+    setEditDelivery(p.delivery);
+    setEditImg(p.img);
+    setEditLogsText(p.logs? p.logs.join("\n\n") : '');
+  };
+
+  const saveEdit = () => {
+    const logsArray = parseLogs(editLogsText);
+    if(logsArray.length===0) return alert("Logs cannot be empty");
+    const updated = products.map(p=>{
+      if(p.id===editingId){
+        return {...p, name: editName, price: Number(editPrice), oldPrice: editOldPrice? Number(editOldPrice):null, delivery: editDelivery, img: editImg, logs: logsArray, stock: logsArray.length}
+      }
+      return p;
+    });
+    saveProducts(updated);
+    setEditingId(null);
+    alert(`Updated! New stock: ${logsArray.length}`);
+  };
+
+  const deleteProduct = (id) => {
+    if(!confirm("Delete?")) return;
+    saveProducts(products.filter(p=>p.id!==id));
+  };
+
+  if(!isAdmin){
     return(
-      <div style={{minHeight:'100vh',display:'flex',alignItems:'center',justifyContent:'center',background:'#f5f5f7'}}>
-        <div style={{background:'white',padding:20,borderRadius:12,width:300}}>
+      <div style={{minHeight:'100vh', display:'flex', alignItems:'center', justifyContent:'center', background:'#f5f5f7', fontFamily:'sans-serif'}}>
+        <div style={{background:'white', padding:24, borderRadius:12, width:320, border:'1px solid #ddd'}}>
           <h3>Admin Login</h3>
-          <p style={{fontSize:12}}>Password: razzy123</p>
-          <input type="password" value={pass} onChange={e=>setPass(e.target.value)} style={{width:'100%',padding:10,border:'1px solid #ddd',borderRadius:8}}/>
-          <button onClick={()=>{if(pass==='razzy123') setIsAuth(true); else alert('wrong');}} style={{width:'100%',marginTop:10,background:'black',color:'white',padding:10,borderRadius:8,border:0}}>Login</button>
+          <input type="password" value={passInput} onChange={e=>setPassInput(e.target.value)} placeholder="Enter admin password" style={{width:'100%', padding:10, borderRadius:8, border:'1px solid #ddd', boxSizing:'border-box', marginTop:10}}/>
+          <button onClick={()=>{ if(passInput===ADMIN_PASS) setIsAdmin(true); else alert("Wrong"); }} style={{width:'100%', marginTop:10, background:'black', color:'white', padding:10, borderRadius:8, border:0, fontWeight:800}}>Login</button>
+          <a href="/" style={{display:'block', textAlign:'center', marginTop:10, fontSize:12}}>Back to Store</a>
         </div>
       </div>
-    );
+    )
   }
 
   return(
-    <div style={{padding:16,background:'#f5f5f7',minHeight:'100vh',fontFamily:'sans-serif'}}>
-      <h2>RAZZY ADMIN - Old Setup</h2>
-
-      <div style={{background:'white',padding:12,borderRadius:12,border:'2px solid green',marginTop:10}}>
-        <h3 style={{color:'green',margin:0}}>SECTION 1: UPLOAD NEW PRODUCT</h3>
-        <input value={newForm.name} onChange={e=>setNewForm({...newForm,name:e.target.value})} placeholder="Name" style={{width:'100%',padding:10,marginTop:8,border:'1px solid #ddd',borderRadius:8,boxSizing:'border-box'}}/>
-        <input type="number" value={newForm.price} onChange={e=>setNewForm({...newForm,price:e.target.value})} placeholder="Price" style={{width:'100%',padding:10,marginTop:8,border:'1px solid #ddd',borderRadius:8,boxSizing:'border-box'}}/>
-        <input type="number" value={newForm.stock} onChange={e=>setNewForm({...newForm,stock:e.target.value})} placeholder="Qty e.g 10" style={{width:'100%',padding:10,marginTop:8,border:'1px solid #ddd',borderRadius:8,boxSizing:'border-box'}}/>
-        <input value={newForm.delivery} onChange={e=>setNewForm({...newForm,delivery:e.target.value})} placeholder="Content / Logs" style={{width:'100%',padding:10,marginTop:8,border:'1px solid #ddd',borderRadius:8,boxSizing:'border-box'}}/>
-        <div style={{marginTop:8}}><b style={{fontSize:12}}>Upload Picture (not link)</b><br/><input type="file" accept="image/*" onChange={e=>handleImg(e,setNewForm)} /></div>
-        {newForm.img && <img src={newForm.img} style={{width:'100%',height:150,objectFit:'contain',marginTop:8,border:'1px solid #eee',borderRadius:8}}/>}
-        <button onClick={()=>{
-          if(!newForm.name||!newForm.price||!newForm.img) return alert('Need name, price, picture');
-          const np={id:Date.now(),name:newForm.name,price:Number(newForm.price),stock:Number(newForm.stock)||10,img:newForm.img,delivery:newForm.delivery,type:'physical',oldPrice:0};
-          setProducts([np,...products]); setNewForm({name:'',price:'',stock:'10',img:'',delivery:''}); alert('Added');
-        }} style={{width:'100%',marginTop:10,background:'green',color:'white',padding:12,border:0,borderRadius:8,fontWeight:800}}>+ Add Product</button>
+    <div style={{fontFamily:'sans-serif', background:'#f5f5f7', minHeight:'100vh', padding:16}}>
+      <div style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+        <h2>Admin Dashboard</h2>
+        <a href="/" style={{background:'black', color:'white', padding:'8px 14px', borderRadius:8, textDecoration:'none', fontSize:12}}>View Store</a>
       </div>
 
-      {editingId && (
-        <div style={{background:'white',padding:12,borderRadius:12,border:'2px solid blue',marginTop:16}}>
-          <h3 style={{color:'blue',margin:0}}>SECTION 2: EDIT PRODUCT - Separate</h3>
-          <p style={{fontSize:11}}>Edit price, picture, qty, content here</p>
-          <input value={editForm.name} onChange={e=>setEditForm({...editForm,name:e.target.value})} style={{width:'100%',padding:10,marginTop:8,border:'1px solid #ddd',borderRadius:8,boxSizing:'border-box'}}/>
-          <input type="number" value={editForm.price} onChange={e=>setEditForm({...editForm,price:e.target.value})} placeholder="Price" style={{width:'100%',padding:10,marginTop:8,border:'1px solid #ddd',borderRadius:8,boxSizing:'border-box'}}/>
-          <input type="number" value={editForm.stock} onChange={e=>setEditForm({...editForm,stock:e.target.value})} placeholder="Qty" style={{width:'100%',padding:10,marginTop:8,border:'1px solid #ddd',borderRadius:8,boxSizing:'border-box'}}/>
-          <input value={editForm.delivery} onChange={e=>setEditForm({...editForm,delivery:e.target.value})} style={{width:'100%',padding:10,marginTop:8,border:'1px solid #ddd',borderRadius:8,boxSizing:'border-box'}}/>
-          <div style={{marginTop:8}}><b style={{fontSize:12}}>Change Picture</b><br/><input type="file" accept="image/*" onChange={e=>handleImg(e,setEditForm)} /></div>
-          {editForm.img && <img src={editForm.img} style={{width:'100%',height:150,objectFit:'contain',marginTop:8,border:'1px solid #eee',borderRadius:8}}/>}
-          <div style={{display:'flex',gap:8,marginTop:10}}>
-            <button onClick={()=>{ setProducts(prev=>prev.map(p=>p.id===editingId?{...p,name:editForm.name,price:Number(editForm.price),stock:Number(editForm.stock),delivery:editForm.delivery,img:editForm.img}:p)); setEditingId(null); alert('Edited'); }} style={{flex:1,background:'blue',color:'white',padding:10,border:0,borderRadius:8}}>Save Edit</button>
-            <button onClick={()=>setEditingId(null)} style={{flex:1,background:'#eee',padding:10,border:0,borderRadius:8}}>Cancel</button>
-          </div>
+      <div style={{background:'white', border:'2px solid #16a34a', borderRadius:12, padding:16, marginTop:16}}>
+        <h3 style={{margin:0, color:'#16a34a'}}>SECTION 1: UPLOAD NEW PRODUCT</h3>
+        <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginTop:12}}>
+          <input value={name} onChange={e=>setName(e.target.value)} placeholder="Product Name" style={{padding:10, borderRadius:8, border:'1px solid #ddd'}}/>
+          <input value={price} onChange={e=>setPrice(e.target.value)} type="number" placeholder="Price" style={{padding:10, borderRadius:8, border:'1px solid #ddd'}}/>
+          <input value={oldPrice} onChange={e=>setOldPrice(e.target.value)} type="number" placeholder="Old Price (optional)" style={{padding:10, borderRadius:8, border:'1px solid #ddd'}}/>
+          <input value={delivery} onChange={e=>setDelivery(e.target.value)} placeholder="Delivery Note" style={{padding:10, borderRadius:8, border:'1px solid #ddd'}}/>
         </div>
-      )}
+        <div style={{marginTop:12}}>
+          <label style={{fontWeight:700, fontSize:12}}>Upload Picture (not link)</label>
+          <input type="file" accept="image/*" onChange={handleImageUpload} style={{display:'block', marginTop:6}}/>
+          {img && <img src={img} style={{width:80, height:80, objectFit:'cover', borderRadius:8, marginTop:8}}/>}
+        </div>
+        <div style={{marginTop:12}}>
+          <label style={{fontWeight:800, fontSize:13}}>Paste ALL Logs Here - Open Big Box</label>
+          <textarea value={logsText} onChange={e=>setLogsText(e.target.value)} placeholder={`Username:- lhemr
+Password:- temal
+2fa:- jehsyh62728
+How to login:- jsksieb
 
-      <div style={{marginTop:20}}>
-        <h3>All Products ({products.length})</h3>
+Username:- pleats
+Password:- marek
+2fa:- jskjwh6262
+How to login:- nnajajdb`} style={{width:'100%', height:240, padding:12, borderRadius:8, border:'2px solid #000', marginTop:8, fontSize:12, fontFamily:'monospace', boxSizing:'border-box'}}/>
+          <div style={{background: previewCount>0? '#dcfce7':'#f5f5f7', padding:8, borderRadius:6, marginTop:6, fontSize:12, fontWeight:700}}>Detected: {previewCount} → Stock {previewCount}</div>
+        </div>
+        <button onClick={handleAddProduct} style={{width:'100%', marginTop:12, background:'black', color:'white', padding:14, borderRadius:8, border:0, fontWeight:900}}>ADD WITH {previewCount} LOGS</button>
+      </div>
+
+      {/* EXISTING PRODUCTS WITH EDIT */}
+      <div style={{background:'white', borderRadius:12, padding:16, marginTop:20, border:'1px solid #ddd'}}>
+        <h3>Existing Products ({products.length})</h3>
         {products.map(p=>(
-          <div key={p.id} style={{background:'white',padding:10,borderRadius:10,marginTop:8,display:'flex',gap:8,alignItems:'center'}}>
-            <img src={p.img} style={{width:50,height:50,objectFit:'cover',borderRadius:6}}/>
-            <div style={{flex:1}}><div style={{fontWeight:700,fontSize:13}}>{p.name}</div><div style={{fontSize:11}}>₦{p.price} • Stock:{p.stock}</div></div>
-            <button onClick={()=>{ setEditingId(p.id); setEditForm({name:p.name,price:p.price,stock:p.stock,img:p.img,delivery:p.delivery}); }} style={{background:'black',color:'white',border:0,padding:'6px 10px',borderRadius:6}}>Edit</button>
-            <button onClick={()=>setProducts(prev=>prev.filter(x=>x.id!==p.id))} style={{background:'#fee2e2',border:0,padding:'6px 10px',borderRadius:6}}>Del</button>
+          <div key={p.id} style={{border:'1px solid #eee', borderRadius:8, padding:10, marginTop:10}}>
+            {editingId===p.id? (
+              <div style={{background:'#fffbeb', padding:12, borderRadius:8, border:'1px solid #f59e0b'}}>
+                <b style={{fontSize:13}}>EDITING: {p.name} - BIG BOX FOR LOGS</b>
+                <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginTop:10}}>
+                  <input value={editName} onChange={e=>setEditName(e.target.value)} placeholder="Name" style={{padding:8, borderRadius:6, border:'1px solid #ddd'}}/>
+                  <input value={editPrice} onChange={e=>setEditPrice(e.target.value)} type="number" placeholder="Price" style={{padding:8, borderRadius:6, border:'1px solid #ddd'}}/>
+                  <input value={editOldPrice} onChange={e=>setEditOldPrice(e.target.value)} type="number" placeholder="Old Price" style={{padding:8, borderRadius:6, border:'1px solid #ddd'}}/>
+                  <input value={editDelivery} onChange={e=>setEditDelivery(e.target.value)} placeholder="Delivery Note" style={{padding:8, borderRadius:6, border:'1px solid #ddd'}}/>
+                </div>
+                <div style={{marginTop:8}}>
+                  <label style={{fontSize:11, fontWeight:700}}>Change Picture:</label>
+                  <input type="file" accept="image/*" onChange={handleEditImageUpload} style={{display:'block', marginTop:4}}/>
+                  {editImg && <img src={editImg} style={{width:60, height:60, borderRadius:6, marginTop:6}}/>}
+                </div>
+                <div style={{marginTop:10}}>
+                  <label style={{fontWeight:800, fontSize:12}}>EDIT LOGS - BIG OPEN SPACE (Add or Remove accounts)</label>
+                  <textarea value={editLogsText} onChange={e=>setEditLogsText(e.target.value)} style={{width:'100%', height:300, padding:12, borderRadius:8, border:'2px solid #000', marginTop:6, fontSize:12, fontFamily:'monospace', boxSizing:'border-box'}}/>
+                  <div style={{background: editPreviewCount>0? '#dcfce7':'#fee2e2', padding:8, borderRadius:6, marginTop:6, fontSize:12, fontWeight:700}}>Edited Count: {editPreviewCount} → New Stock {editPreviewCount}</div>
+                </div>
+                <div style={{display:'flex', gap:8, marginTop:10}}>
+                  <button onClick={saveEdit} style={{flex:1, background:'#16a34a', color:'white', padding:10, borderRadius:6, border:0, fontWeight:800}}>SAVE EDIT ({editPreviewCount} logs)</button>
+                  <button onClick={()=>setEditingId(null)} style={{flex:1, background:'#eee', padding:10, borderRadius:6, border:0}}>Cancel</button>
+                </div>
+              </div>
+            ) : (
+              <div style={{display:'flex', gap:10}}>
+                <img src={p.img} style={{width:60, height:60, objectFit:'cover', borderRadius:6}}/>
+                <div style={{flex:1}}>
+                  <div style={{fontWeight:800, fontSize:13}}>{p.name} - ₦{p.price} - Stock: {p.stock}</div>
+                  <div style={{fontSize:11, color:'#666', marginTop:4, maxHeight:60, overflow:'auto', background:'#fafafa', padding:6, borderRadius:4, fontFamily:'monospace', whiteSpace:'pre-wrap'}}>{p.logs? p.logs.slice(0,1).join("\n\n") : "No logs"} {p.logs && p.logs.length>1? `\n... +${p.logs.length-1} more` : ''}</div>
+                  <div style={{fontSize:10, marginTop:4}}>Total stored: {p.logs?.length||0}</div>
+                </div>
+                <div style={{display:'flex', flexDirection:'column', gap:6}}>
+                  <button onClick={()=>startEdit(p)} style={{background:'#dbeafe', color:'#2563eb', border:0, padding:'6px 12px', borderRadius:6, fontSize:11, fontWeight:700}}>Edit</button>
+                  <button onClick={()=>deleteProduct(p.id)} style={{background:'#fee2e2', color:'#dc2626', border:0, padding:'6px 12px', borderRadius:6, fontSize:11}}>Delete</button>
+                </div>
+              </div>
+            )}
           </div>
         ))}
       </div>
