@@ -3,9 +3,10 @@ import { useState, useEffect } from 'react';
 import { supabase } from './lib/supabase';
 
 const PRODUCTS = [
-  { id: 1, name: 'Facebook Create Page ✅', desc: 'All accounts can create page • Instant Delivery', price: 4000, emoji: '📘' },
-  { id: 2, name: 'Uk Physical Sim', desc: 'Giffgaff/O2 UK Sim • Tracking included', price: 26000, emoji: '🇬🇧' },
-  { id: 3, name: 'T-Mobile Physical Sim', desc: 'USA T-Mobile 5G • Free shipping', price: 120000, emoji: '🇺🇸' },
+  { id: 1, type: 'digital', name: 'Facebook Create Page ✅', desc: 'All accounts can create page', price: 4000, delivery: 'FB123-Page-Creation-Key: PAGE-RAZZY-8849 | Login to facebook.com/pages/create and use this approval' },
+  { id: 2, type: 'physical', name: 'UK Physical Sim', desc: 'Giffgaff / O2 UK Sim', price: 26000, delivery: 'Tracking: UK-GF-99283 | Courier: DHL | ETA: 3-5 days | Will be shipped to your address on file' },
+  { id: 3, type: 'physical', name: 'T-Mobile Physical Sim', desc: 'USA T-Mobile 5G SIM', price: 120000, delivery: 'Tracking: TM-US-11293 | Courier: FedEx | ETA: 5-7 days | Customs cleared' },
+  { id: 4, type: 'digital', name: 'USA Virtual Number', desc: 'For WhatsApp / Telegram', price: 8000, delivery: 'Number: +1 (323) 555-0199 | OTP Code: 774291 | Valid 20 mins - Copy and use now' },
 ];
 
 export default function Home() {
@@ -15,23 +16,18 @@ export default function Home() {
   const [password, setPassword] = useState('');
   const [isRegister, setIsRegister] = useState(false);
   const [loading, setLoading] = useState(false);
-
-  const [cart, setCart] = useState([]);
-  const [qtys, setQtys] = useState({1:1,2:1,3:1});
-  const [showCart, setShowCart] = useState(false);
+  const [paying, setPaying] = useState(null);
   const [orders, setOrders] = useState([]);
+  const [activeDelivery, setActiveDelivery] = useState(null);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => { setUser(data.session?.user||null); setChecking(false); });
     const { data: l } = supabase.auth.onAuthStateChange((_, s) => setUser(s?.user||null));
-    const saved = localStorage.getItem('razzy_cart_v2');
-    if (saved) setCart(JSON.parse(saved));
-    const savedOrders = localStorage.getItem('razzy_orders');
-    if (savedOrders) setOrders(JSON.parse(savedOrders));
+    const saved = localStorage.getItem('razzy_orders_final');
+    if (saved) setOrders(JSON.parse(saved));
     return () => l.subscription.unsubscribe();
   }, []);
-  useEffect(() => { localStorage.setItem('razzy_cart_v2', JSON.stringify(cart)); }, [cart]);
-  useEffect(() => { localStorage.setItem('razzy_orders', JSON.stringify(orders)); }, [orders]);
+  useEffect(() => { localStorage.setItem('razzy_orders_final', JSON.stringify(orders)); }, [orders]);
 
   const handleAuth = async () => {
     if (!email ||!password) return alert('Fill email & password');
@@ -49,41 +45,26 @@ export default function Home() {
     setLoading(false);
   };
 
-  const changeQty = (id, delta) => {
-    setQtys(prev => ({...prev, [id]: Math.max(1, (prev[id]||1)+delta) }));
+  const handlePay = async (product) => {
+    setPaying(product.id);
+    // Simulate Paystack payment - 2 seconds
+    await new Promise(r => setTimeout(r, 2000));
+
+    const newOrder = {
+      id: Date.now(),
+      product: product.name,
+      price: product.price,
+      type: product.type,
+      deliveryInfo: product.delivery,
+      date: new Date().toLocaleString(),
+      status: product.type==='digital'? 'Delivered Instantly' : 'Shipped - On the way'
+    };
+    setOrders(prev => [newOrder,...prev]);
+    setPaying(null);
+    setActiveDelivery(newOrder);
   };
 
-  const addToCart = (p) => {
-    const qty = qtys[p.id]||1;
-    setCart(prev => {
-      const ex = prev.find(i => i.id === p.id);
-      if (ex) return prev.map(i => i.id===p.id? {...i, qty: i.qty+qty} : i);
-      return [...prev, {...p, qty}];
-    });
-    setShowCart(true);
-  };
-
-  const updateCartQty = (id, delta) => {
-    setCart(prev => prev.map(i => {
-      if (i.id===id) {
-        const newQty = i.qty+delta;
-        if (newQty<1) return null;
-        return {...i, qty:newQty};
-      }
-      return i;
-    }).filter(Boolean));
-  };
-
-  const checkout = () => {
-    if (cart.length===0) return;
-    const order = { id: Date.now(), items: [...cart], total: cart.reduce((s,i)=>s+i.price*i.qty,0), date: new Date().toLocaleString(), status: 'Delivered' };
-    setOrders(prev => [order,...prev]);
-    setCart([]);
-    setShowCart(false);
-    alert(`Order Successful! ✅\n\nDigital items will be delivered in your dashboard instantly!\nOrder ID: ${order.id}\nCheck "My Orders" below`);
-  };
-
-  if (checking) return <div style={{display:'flex',height:'100vh',alignItems:'center',justifyContent:'center',background:'#f6f6f7'}}>Loading Razzy Store...</div>;
+  if (checking) return <div style={{display:'flex',height:'100vh',alignItems:'center',justifyContent:'center',background:'#f6f6f7'}}>Loading...</div>;
 
   if (!user) {
     return (
@@ -100,7 +81,69 @@ export default function Home() {
     );
   }
 
-  const total = cart.reduce((s,i)=>s+i.price*i.qty,0);
   return (
     <>
-    <style>{`body{margin:0;font-family:-apple-system,sans-serif;background:#f6f6f7}.header{position:sticky;top:0;background:white;border-bottom:1px solid #eee;padding:14px 16px;display:flex;justify-content:space-between;align-items:center;z-index:5}.grid{max-width:1000px;margin:16px auto;padding:0 16px;display:grid;grid-template-columns:1fr 1fr;gap:14px} @media(min-width:700px){.grid{grid-template-columns:1fr 1fr 1fr}}.card2{background:white;border-radius:20px;padding:18px;border:1px solid #f0f0f0;box-shadow:0 2px 8px rgba(0,0,0,0.04)}.qtyBox{display:flex;align-items:center;gap:10px;background:#f6f6f7;border-radius:999px;padding:4px 10px;margin-top:10px;width:fit-content}.qtyBtn{width:28px;height:28px;border-radius:999px;border:1px solid #ddd;background:white;cursor:pointer;font-weight:700}.overlay{position:fixed;inset:0;background:rgba(0,0,0,0.3);display:flex;justify-content:flex-end;z-index:20}.drawer{background:white;width:100%;max-width:380px;height:100%;padding:20px;display:flex;flex-direction:column}.del
+    <style>{`body{margin:0;font-family:-apple-system,sans-serif;background:#f6f6f7}.header{position:sticky;top:0;background:white;border-bottom:1px solid #eee;padding:14px 16px;display:flex;justify-content:space-between;align-items:center;z-index:5}.grid{max-width:1000px;margin:16px auto;padding:0 16px;display:grid;grid-template-columns:1fr;gap:14px} @media(min-width:600px){.grid{grid-template-columns:1fr 1fr}}.card2{background:white;border-radius:20px;padding:20px;border:1px solid #f0f0f0;box-shadow:0 2px 8px rgba(0,0,0,0.04)}.badge{font-size:10px;padding:4px 8px;border-radius:999px;font-weight:800}.badge-digital{background:#e7f9ed;color:#0a7a2d}.badge-physical{background:#e8f0ff;color:#1a56db}.supportBtn{position:fixed;bottom:20px;right:20px;background:#25D366;color:white;border:0;width:56px;height:56px;border-radius:999px;font-size:28px;box-shadow:0 4px 12px rgba(0,0,0,0.2);cursor:pointer;z-index:50;display:flex;align-items:center;justify-content:center}`}</style>
+
+    <div className="header">
+      <div style={{fontWeight:900}}>RAZZY STORE</div>
+      <div style={{display:'flex',gap:8,alignItems:'center'}}>
+        <span style={{fontSize:12,color:'#666'}}>Hi, {user.email.split('@')[0]}</span>
+        <button onClick={()=>supabase.auth.signOut()} style={{background:'#f0f0f0',border:0,padding:'8px 14px',borderRadius:999,fontWeight:600,fontSize:12}}>Logout</button>
+      </div>
+    </div>
+
+    <div style={{maxWidth:1000,margin:'12px auto',padding:'0 16px'}}>
+      <h2 style={{fontWeight:900,fontSize:20}}>Pay & Get Instantly ⚡</h2>
+      <p style={{fontSize:13,color:'#666',marginTop:4}}>Digital products delivered on site immediately • Physical SIMs shipped with tracking</p>
+    </div>
+
+    <div className="grid">
+      {PRODUCTS.map(p=>(
+        <div key={p.id} className="card2">
+          <div style={{display:'flex',justifyContent:'space-between'}}><span style={{fontSize:28}}>{p.type==='digital'?'📦':'📮'}</span><span className={`badge ${p.type==='digital'?'badge-digital':'badge-physical'}`}>{p.type==='digital'?'DIGITAL • INSTANT':'PHYSICAL • SHIPPED'}</span></div>
+          <div style={{fontWeight:800,marginTop:10,fontSize:16}}>{p.name}</div>
+          <div style={{fontSize:13,color:'#666',marginTop:4}}>{p.desc}</div>
+          <div style={{fontWeight:900,marginTop:12,fontSize:18}}>₦{p.price.toLocaleString()}</div>
+          <button disabled={paying} onClick={()=>handlePay(p)} style={{width:'100%',marginTop:14,background: paying===p.id? '#999' : 'black',color:'white',border:0,padding:'14px',borderRadius:999,fontWeight:800,cursor:'pointer'}}>
+            {paying===p.id? 'Processing payment...' : `Pay ₦${p.price.toLocaleString()} & Get Now`}
+          </button>
+          <div style={{fontSize:11,color:'#888',textAlign:'center',marginTop:8}}>{p.type==='digital'? '✓ Delivered inside this site after payment' : '✓ Tracking number provided after payment'}</div>
+        </div>
+      ))}
+    </div>
+
+    {orders.length>0 && (
+      <div style={{maxWidth:1000,margin:'24px auto',padding:'0 16px'}}>
+        <h3 style={{fontWeight:900}}>My Purchases / Deliveries</h3>
+        {orders.map(o=>(
+          <div key={o.id} style={{background:'white',borderRadius:16,padding:16,marginTop:12,border:'1px solid #eee'}}>
+            <div style={{display:'flex',justifyContent:'space-between'}}><b style={{fontSize:14}}>{o.product}</b><span style={{fontSize:11,fontWeight:800,color: o.type==='digital'?'green':'blue'}}>{o.status}</span></div>
+            <div style={{fontSize:12,color:'#888',marginTop:4}}>{o.date} • ₦{o.price.toLocaleString()}</div>
+            <div style={{fontSize:13,marginTop:10,background:'#f8f9ff',padding:12,borderRadius:12,border:'1px dashed #ddd',whiteSpace:'pre-wrap'}}>{o.deliveryInfo}</div>
+            <button onClick={()=>setActiveDelivery(o)} style={{marginTop:10,background:'#f0f0f0',border:0,padding:'8px 12px',borderRadius:999,fontSize:12,fontWeight:700}}>View Again</button>
+          </div>
+        ))}
+      </div>
+    )}
+
+    {/* DELIVERY MODAL */}
+    {activeDelivery && (
+      <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',backdropFilter:'blur(6px)',display:'flex',alignItems:'center',justifyContent:'center',padding:20,zIndex:100}} onClick={()=>setActiveDelivery(null)}>
+        <div style={{background:'white',width:'100%',maxWidth:400,borderRadius:20,padding:24}} onClick={e=>e.stopPropagation()}>
+          <div style={{textAlign:'center',fontSize:48}}>✅</div>
+          <h2 style={{textAlign:'center',fontWeight:900,marginTop:10}}>Payment Successful!</h2>
+          <p style={{textAlign:'center',fontSize:13,color:'#666',marginTop:6}}>{activeDelivery.type==='digital'? 'Your digital product is ready - Use now:' : 'Your physical product is on the way:'}</p>
+          <div style={{background:activeDelivery.type==='digital'?'#f0fdf4':'#eff6ff',border:'2px dashed #ccc',borderRadius:12,padding:14,marginTop:16,fontSize:13,whiteSpace:'pre-wrap',fontWeight:600}}>{activeDelivery.deliveryInfo}</div>
+          <div style={{fontSize:11,color:'#888',textAlign:'center',marginTop:10}}>Saved in My Purchases forever • Access anytime</div>
+          <button onClick={()=>setActiveDelivery(null)} style={{width:'100%',marginTop:16,background:'black',color:'white',border:0,padding:'14px',borderRadius:999,fontWeight:800}}>Done</button>
+        </div>
+      </div>
+    )}
+
+    {/* WHATSAPP SUPPORT ONLY */}
+    <a href="https://wa.me/2348100000000?text=Hi Razzy Support, I need help" target="_blank" className="supportBtn" title="Customer Support">💬</a>
+    <div style={{position:'fixed',bottom:85,right:22,background:'black',color:'white',fontSize:11,padding:'6px 10px',borderRadius:999}}>Support</div>
+    </>
+  );
+}
