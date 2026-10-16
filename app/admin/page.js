@@ -1,85 +1,78 @@
 "use client";
-import { useState, useEffect, useRef } from "react";
-export default function Admin(){
+import { useState, useEffect } from "react";
+
+export default function Shop(){
+const PAYSTACK_KEY="pk_live_e53e70211b051a607dea27a34fe32091d35917c2";
 const [products,setProducts]=useState([]);
-const [form,setForm]=useState({name:"",price:"",type:"digital",qty:"1",img:"",badge:""});
-const [editId,setEditId]=useState(null);
-const fileRef=useRef(null);
-useEffect(()=>{const s=localStorage.getItem("razzy_products"); if(s) setProducts(JSON.parse(s));},[]);
+const [search,setSearch]=useState("");
+const [showPay,setShowPay]=useState(null);
+const [delivered,setDelivered]=useState(null);
+const [customer,setCustomer]=useState({name:"",email:"",phone:""});
+
+useEffect(()=>{
+ const s=localStorage.getItem("razzy_products");
+ if(s) setProducts(JSON.parse(s));
+ const script=document.createElement("script");
+ script.src="https://js.paystack.co/v1/inline.js";
+ document.body.appendChild(script);
+},[]);
+
 useEffect(()=>{localStorage.setItem("razzy_products",JSON.stringify(products));},[products]);
 
-const handleFile=(e)=>{
- const file=e.target.files[0];
- if(!file) return;
- if(file.size> 700000) return alert("Image too big, choose smaller pic under 700kb");
- const reader=new FileReader();
- reader.onload=()=>{setForm({...form,img:reader.result});};
- reader.readAsDataURL(file);
-};
+const filtered=products.filter(p=>p.name.toLowerCase().includes(search.toLowerCase()));
 
-const save=()=>{
-if(!form.name||!form.price) return alert("Add name & price");
-if(!form.img) return alert("Please upload image");
-if(editId){
-setProducts(products.map(p=>p.id===editId?{...p,...form,price:Number(form.price),qty:Number(form.qty)}:p));
-setEditId(null);
-} else {
-setProducts([...products,{id:Date.now(),...form,price:Number(form.price),qty:Number(form.qty)}]);
-}
-setForm({name:"",price:"",type:"digital",qty:"1",img:"",badge:""});
-if(fileRef.current) fileRef.current.value="";
+const buyNow=(product)=>{
+ if(product.qty<=0) return alert("Sold out");
+ if(!customer.name||!customer.email) return alert("Enter your name & email first");
+ if(product.type==="digital"){
+   const lines=product.delivery? product.delivery.split("\n").filter(l=>l.trim()!=="") : [];
+   if(lines.length===0) return alert("This digital product has no delivery stock. Contact admin.");
+ }
+
+ const handler=window.PaystackPop.setup({
+  key:PAYSTACK_KEY,
+  email:customer.email,
+  amount:product.price*100,
+  currency:"NGN",
+  metadata:{custom_fields:[{display_name:"Product",variable_name:"product",value:product.name}]},
+  callback:function(response){
+    // PAYMENT SUCCESS - DELIVER 1
+    let deliveryText="";
+    let newProducts=[...products];
+    let idx=newProducts.findIndex(p=>p.id===product.id);
+    if(idx>-1){
+      if(newProducts[idx].type==="digital"){
+        let lines=newProducts[idx].delivery.split("\n").filter(l=>l.trim()!=="");
+        deliveryText=lines[0]; // Give first line
+        let remaining=lines.slice(1).join("\n");
+        newProducts[idx].delivery=remaining;
+        newProducts[idx].qty=Math.max(0,newProducts[idx].qty-1);
+      } else {
+        deliveryText="Order Received! We will contact you for delivery. Phone: "+customer.phone;
+        newProducts[idx].qty=Math.max(0,newProducts[idx].qty-1);
+      }
+      setProducts(newProducts);
+      // Save order history
+      const orders=JSON.parse(localStorage.getItem("razzy_orders")||"[]");
+      orders.push({id:Date.now(),product:product.name,price:product.price,customer,delivery:deliveryText,ref:response.reference,date:new Date().toLocaleString()});
+      localStorage.setItem("razzy_orders",JSON.stringify(orders));
+    }
+    setDelivered({productName:product.name,text:deliveryText,ref:response.reference});
+    setShowPay(null);
+  },
+  onClose:function(){alert("Payment closed");},
+ });
+ handler.openIframe();
 };
-const edit=(p)=>{setForm({name:p.name,price:p.price,type:p.type,qty:p.qty,img:p.img,badge:p.badge||""});setEditId(p.id);window.scrollTo(0,0);};
-const del=(id)=>{if(confirm("Delete this product?")) setProducts(products.filter(p=>p.id!==id));};
-const changeQty=(id,delta)=>{setProducts(products.map(p=>p.id===id?{...p,qty:Math.max(0,p.qty+delta)}:p));};
 
 return(
-<div style={{padding:15,fontFamily:"sans-serif",maxWidth:650,margin:"0 auto",background:"#f5f5f5",minHeight:"100vh"}}>
-<h2>Razzy Admin - PRO</h2>
-<div style={{background:"white",padding:15,borderRadius:10}}>
-<h4 style={{marginTop:0}}>{editId?"✏️ EDIT Product":"➕ ADD New Product"}</h4>
-<div style={{display:"grid",gap:10}}>
-<input placeholder="Product name e.g UK SIM" value={form.name} onChange={e=>setForm({...form,name:e.target.value})} style={{padding:12,border:"1px solid #ddd",borderRadius:6}}/>
-<div style={{display:"flex",gap:10}}>
-<input placeholder="Price N" type="number" value={form.price} onChange={e=>setForm({...form,price:e.target.value})} style={{flex:1,padding:12,border:"1px solid #ddd",borderRadius:6}}/>
-<input placeholder="Qty" type="number" value={form.qty} onChange={e=>setForm({...form,qty:e.target.value})} style={{flex:1,padding:12,border:"1px solid #ddd",borderRadius:6}}/>
-</div>
-
-{/* UPLOAD BUTTON */}
-<div style={{border:"2px dashed #f68b1e",padding:12,borderRadius:8,textAlign:"center",background:"#fff8f0"}}>
-<input ref={fileRef} type="file" accept="image/*" onChange={handleFile} style={{width:"100%"}}/>
-<p style={{fontSize:11,margin:"6px 0 0",color:"#666"}}>Tap to choose picture from gallery</p>
-</div>
-
-{form.img&&<img src={form.img} style={{width:"100%",height:180,objectFit:"cover",borderRadius:8,border:"1px solid #ddd"}}/>}
-
-<div style={{display:"flex",gap:10}}>
-<select value={form.type} onChange={e=>setForm({...form,type:e.target.value})} style={{flex:1,padding:12,borderRadius:6}}><option value="physical">Physical - SIM / Voice Changer</option><option value="digital">Digital</option></select>
-<input placeholder="Badge (optional) e.g HOT" value={form.badge} onChange={e=>setForm({...form,badge:e.target.value})} style={{flex:1,padding:12,border:"1px solid #ddd",borderRadius:6}}/>
-</div>
-<button onClick={save} style={{background:editId?"#f68b1e":"black",color:"white",padding:14,borderRadius:6,fontWeight:"bold",border:"none"}}>{editId?"UPDATE PRODUCT":"ADD PRODUCT"}</button>
-{editId&&<button onClick={()=>{setEditId(null);setForm({name:"",price:"",type:"digital",qty:"1",img:"",badge:""}); if(fileRef.current) fileRef.current.value="";}} style={{background:"#eee",padding:10,borderRadius:6,border:"none"}}>Cancel</button>}
+<div style={{fontFamily:"sans-serif",background:"#f5f5f5",minHeight:"100vh"}}>
+<div style={{background:"black",color:"white",padding:15,position:"sticky",top:0,zIndex:10}}>
+<div style={{maxWidth:1000,margin:"0 auto",display:"flex",gap:10,alignItems:"center"}}>
+<b style={{fontSize:18}}>RAZZY STORE</b>
+<input placeholder="Search product..." value={search} onChange={e=>setSearch(e.target.value)} style={{flex:1,padding:10,borderRadius:6,border:"none"}}/>
+<a href="/admin" style={{color:"white",fontSize:12}}>Admin</a>
 </div>
 </div>
 
-<h3 style={{marginTop:25}}>Products ({products.length}) - Qty with +/- | Delete removes from shop</h3>
-{products.map(p=>(
-<div key={p.id} style={{background:"white",padding:12,borderRadius:10,marginTop:12,display:"flex",gap:12,alignItems:"center"}}>
-<img src={p.img} style={{width:70,height:70,objectFit:"cover",borderRadius:8}}/>
-<div style={{flex:1}}>
-<b style={{fontSize:14}}>{p.name} {p.qty===0&&<span style={{color:"red"}}> OUT</span>} {p.badge&&<span style={{background:"#f68b1e",color:"white",fontSize:10,padding:"2px 6px",borderRadius:4,marginLeft:6}}>{p.badge}</span>}</b><br/>
-<span style={{fontSize:12}}>N{p.price.toLocaleString()} - Qty: {p.qty}</span><br/>
-<div style={{display:"flex",gap:6,marginTop:6}}>
-<button onClick={()=>changeQty(p.id,-1)} style={{padding:"4px 10px",border:"1px solid #ddd",borderRadius:4}}>-</button>
-<span style={{padding:"4px 8px",background:"#f5f5f5",borderRadius:4,fontSize:12}}>{p.qty}</span>
-<button onClick={()=>changeQty(p.id,1)} style={{padding:"4px 10px",border:"1px solid #ddd",borderRadius:4}}>+</button>
-<button onClick={()=>edit(p)} style={{marginLeft:8,padding:"4px 12px",background:"#f68b1e",color:"white",border:"none",borderRadius:4,fontSize:12}}>Edit</button>
-</div>
-</div>
-<button onClick={()=>del(p.id)} style={{background:"#ff3b30",color:"white",border:"none",padding:"8px 12px",borderRadius:6,fontWeight:"bold"}}>DELETE</button>
-</div>
-))}
-<a href="/" style={{display:"block",marginTop:25,textAlign:"center",background:"black",color:"white",padding:14,borderRadius:8,textDecoration:"none",fontWeight:"bold"}}>Go to Shop →</a>
-</div>
-);
-}
+<div style={{maxWidth:1000,margin:"0 auto",
