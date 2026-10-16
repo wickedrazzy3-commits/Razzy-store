@@ -1,62 +1,89 @@
-"use client";
-import { useState, useEffect } from "react";
-
-const DEFAULTS=[
- {id:1,name:"UK Physical SIM - Ready for WhatsApp",price:15000,oldPrice:18000,type:"physical",img:"https://images.unsplash.com/photo-1592898751226-3804d78dc5db?w=400"},
- {id:2,name:"USA T-Mobile SIM - 5G Unlimited",price:20000,oldPrice:25000,type:"physical",img:"https://images.unsplash.com/photo-1581993192872-14d6f2e1e0d4?w=400"},
- {id:3,name:"Voice Changer Device - 8 Voices",price:35000,oldPrice:45000,type:"physical",img:"https://images.unsplash.com/photo-1590658268037-6bf12165a8df?w=400"},
- {id:4,name:"Aged TikTok Account 1k Followers",price:12000,oldPrice:15000,type:"digital",img:"https://images.unsplash.com/photo-1611162616475-46b76543ac5f?w=400"},
-];
+'use client';
+import { useState, useEffect } from 'react';
 
 export default function Admin(){
- const [products,setProducts]=useState(DEFAULTS);
- const [form,setForm]=useState({name:"",price:"",oldPrice:"",type:"physical",img:""});
+  const [products, setProducts] = useState([]);
+  const [editing, setEditing] = useState(null);
+  const [form, setForm] = useState({name:'',price:'',oldPrice:'',stock:'',img:'',type:'physical',delivery:''});
+  const [isAuth, setIsAuth] = useState(false);
+  const [pass, setPass] = useState('');
 
- useEffect(()=>{const s=localStorage.getItem("razzy_products"); if(s) setProducts(JSON.parse(s));},[]);
- useEffect(()=>{localStorage.setItem("razzy_products",JSON.stringify(products));},[products]);
+  useEffect(()=>{
+    const s=localStorage.getItem("razzy_products");
+    if(s){ try{ setProducts(JSON.parse(s)); }catch{} }
+  },[]);
+  useEffect(()=>{ localStorage.setItem("razzy_products", JSON.stringify(products)); },[products]);
 
- const add=()=>{
-   if(!form.name||!form.price) return alert("Enter name & price");
-   setProducts([...products,{id:Date.now(),...form,price:Number(form.price),oldPrice:Number(form.oldPrice||form.price)}]);
-   setForm({name:"",price:"",oldPrice:"",type:"physical",img:""});
- };
- const del=(id)=>setProducts(products.filter(p=>p.id!==id));
- const updatePrice=(id,newPrice)=>setProducts(products.map(p=>p.id===id?{...p,price:Number(newPrice)}:p));
+  const login=()=>{
+    if(pass==="razzy123"){ setIsAuth(true); } else alert('Wrong! Password is razzy123');
+  };
 
- return(
-  <div style={{padding:15,fontFamily:"sans-serif",maxWidth:600,margin:"0 auto"}}>
-   <h2>RAZZY ADMIN - Control Prices</h2>
-   <div style={{background:"#fff3e0",padding:10,borderRadius:8,marginBottom:15,fontSize:13}}>
-     💡 <b>How it works:</b> Change price here → Go to main shop page → It will use new price. For customers worldwide to see new price forever, after editing, copy products and paste to <b>app/page.js</b> (I will show you).
-   </div>
-   <div style={{display:"grid",gap:8,background:"white",padding:15,borderRadius:8,boxShadow:"0 2px 5px rgba(0,0,0,0.1)"}}>
-     <input placeholder="Product Name e.g UK SIM" value={form.name} onChange={e=>setForm({...form,name:e.target.value})} style={{padding:10,border:"1px solid #ddd",borderRadius:4}}/>
-     <div style={{display:"flex",gap:8}}>
-       <input placeholder="Your Price ₦" type="number" value={form.price} onChange={e=>setForm({...form,price:e.target.value})} style={{flex:1,padding:10,border:"1px solid #ddd",borderRadius:4}}/>
-       <input placeholder="Old Price ₦" type="number" value={form.oldPrice} onChange={e=>setForm({...form,oldPrice:e.target.value})} style={{flex:1,padding:10,border:"1px solid #ddd",borderRadius:4}}/>
-     </div>
-     <input placeholder="Image Link (https://...)" value={form.img} onChange={e=>setForm({...form,img:e.target.value})} style={{padding:10,border:"1px solid #ddd",borderRadius:4}}/>
-     <select value={form.type} onChange={e=>setForm({...form,type:e.target.value})} style={{padding:10}}><option value="physical">Physical - SIM / Voice Changer</option><option value="digital">Digital - Social Account</option></select>
-     <button onClick={add} style={{background:"black",color:"white",padding:12,borderRadius:4,fontWeight:"bold"}}>ADD / UPDATE PRODUCT</button>
-   </div>
+  const startEdit=(p)=>{
+    setEditing(p.id);
+    setForm({name:p.name,price:p.price,oldPrice:p.oldPrice||'',stock:p.stock,img:p.img,type:p.type||'physical',delivery:p.delivery||''});
+  };
 
-   <h3 style={{marginTop:20}}>Your Products ({products.length}) - Tap to change price</h3>
-   {products.map(p=>(
-     <div key={p.id} style={{background:"white",padding:10,marginTop:10,borderRadius:8,display:"flex",gap:10,alignItems:"center",boxShadow:"0 1px 3px rgba(0,0,0,0.1)"}}>
-       <img src={p.img||"https://via.placeholder.com/60"} style={{width:60,height:60,objectFit:"cover",borderRadius:6}}/>
-       <div style={{flex:1}}>
-         <div style={{fontSize:13,fontWeight:"bold"}}>{p.name}</div>
-         <div style={{fontSize:12}}>{p.type} - ₦{p.price.toLocaleString()} <input type="number" value={p.price} onChange={e=>updatePrice(p.id,e.target.value)} style={{width:80,marginLeft:10,padding:4}}/></div>
-       </div>
-       <button onClick={()=>del(p.id)} style={{background:"red",color:"white",border:"none",padding:"8px 10px",borderRadius:4}}>X</button>
-     </div>
-   ))}
+  const saveEdit=()=>{
+    if(!form.name||!form.price) return alert('Name & Price required');
+    setProducts(prev=>prev.map(pr=>pr.id===editing?{...pr, name:form.name, price:Number(form.price), oldPrice:Number(form.oldPrice)||0, stock:Number(form.stock), img:form.img, type:form.type, delivery:form.delivery }:pr));
+    setEditing(null); alert('Updated! ✅ Customers will see new stock/price instantly');
+  };
 
-   <div style={{marginTop:20,padding:15,background:"#e8f5e9",borderRadius:8}}>
-     <b>Want it live for all customers?</b><br/>After you set your desired prices, tell me "Export" — I will generate the new code for your main shop page.js so it stays permanent on Vercel.
-   </div>
+  const addStock=(id,amount)=>{
+    setProducts(prev=>prev.map(pr=>pr.id===id?{...pr, stock:pr.stock+amount}:pr));
+  };
 
-   <a href="/" style={{display:"block",marginTop:20,textAlign:"center",background:"#f68b1e",color:"white",padding:12,borderRadius:4,textDecoration:"none",fontWeight:"bold"}}>← Go to Shop</a>
-  </div>
- );
+  const addNew=()=>{
+    const newId=Date.now();
+    const newP={id:newId, name:form.name||"New Product", price:Number(form.price)||1000, oldPrice:Number(form.oldPrice)||0, stock:Number(form.stock)||10, img:form.img||"https://images.unsplash.com/photo-1592898751226-3804d78dc5db?w=400", type:form.type||'physical', delivery:form.delivery||"Delivery info"};
+    setProducts(prev=>[newP,...prev]); setForm({name:'',price:'',oldPrice:'',stock:'',img:'',type:'physical',delivery:''}); alert('Added!');
+  };
+
+  const deleteProd=(id)=>{ if(confirm('Delete?')) setProducts(prev=>prev.filter(p=>p.id!==id)); };
+
+  if(!isAuth){
+    return(<div style={{minHeight:'100vh',display:'flex',alignItems:'center',justifyContent:'center',fontFamily:'sans-serif'}}><div style={{background:'white',padding:24,borderRadius:12,width:320}}><h2>Admin Login</h2><p style={{fontSize:12}}>Password: razzy123</p><input type="password" value={pass} onChange={e=>setPass(e.target.value)} placeholder="Password" style={{width:'100%',padding:10,borderRadius:8,border:'1px solid #ddd',boxSizing:'border-box'}}/><button onClick={login} style={{width:'100%',marginTop:10,background:'black',color:'white',padding:10,borderRadius:8,border:0}}>Login</button></div></div>);
+  }
+
+  return(
+    <div style={{fontFamily:'sans-serif',padding:20,background:'#f5f5f7',minHeight:'100vh'}}>
+      <h1 style={{fontWeight:900}}>RAZZY ADMIN - Edit Products & Stock</h1>
+      <div style={{background:'white',padding:16,borderRadius:12,marginTop:16}}>
+        <h3>{editing?'Edit Product':'Add New Product'}</h3>
+        <input value={form.name} onChange={e=>setForm({...form,name:e.target.value})} placeholder="Product Name" style={{width:'100%',padding:10,marginTop:6,borderRadius:8,border:'1px solid #ddd',boxSizing:'border-box'}}/>
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:8,marginTop:8}}>
+          <input type="number" value={form.price} onChange={e=>setForm({...form,price:e.target.value})} placeholder="Price e.g 4000" style={{padding:10,borderRadius:8,border:'1px solid #ddd'}}/>
+          <input type="number" value={form.stock} onChange={e=>setForm({...form,stock:e.target.value})} placeholder="Qty e.g 10" style={{padding:10,borderRadius:8,border:'1px solid #ddd'}}/>
+          <input type="number" value={form.oldPrice} onChange={e=>setForm({...form,oldPrice:e.target.value})} placeholder="Old Price" style={{padding:10,borderRadius:8,border:'1px solid #ddd'}}/>
+        </div>
+        <input value={form.img} onChange={e=>setForm({...form,img:e.target.value})} placeholder="Image URL" style={{width:'100%',padding:10,marginTop:8,borderRadius:8,border:'1px solid #ddd',boxSizing:'border-box'}}/>
+        <input value={form.delivery} onChange={e=>setForm({...form,delivery:e.target.value})} placeholder="Delivery info e.g Tracking or Page Key" style={{width:'100%',padding:10,marginTop:8,borderRadius:8,border:'1px solid #ddd',boxSizing:'border-box'}}/>
+        <div style={{display:'flex',gap:8,marginTop:10}}>
+          {editing?<><button onClick={saveEdit} style={{flex:1,background:'#16a34a',color:'white',padding:12,borderRadius:8,border:0,fontWeight:800}}>Save Changes ✅</button><button onClick={()=>setEditing(null)} style={{flex:1,background:'#eee',padding:12,borderRadius:8,border:0}}>Cancel</button></>:<button onClick={addNew} style={{flex:1,background:'black',color:'white',padding:12,borderRadius:8,border:0,fontWeight:800}}>+ Add Product</button>}
+        </div>
+      </div>
+
+      <div style={{marginTop:20}}>
+        <h3>All Products ({products.length}) - Stock auto reduces when customer buys</h3>
+        {products.map(p=>(
+          <div key={p.id} style={{background:'white',padding:12,borderRadius:12,marginTop:10,display:'flex',gap:12,alignItems:'center'}}>
+            <img src={p.img} style={{width:60,height:60,borderRadius:8,objectFit:'cover'}}/>
+            <div style={{flex:1}}>
+              <div style={{fontWeight:800,fontSize:14}}>{p.name}</div>
+              <div style={{fontSize:12}}>₦{p.price} • Stock: <b style={{color:p.stock<5?'red':'green'}}>{p.stock}</b> left • Type: {p.type}</div>
+              <div style={{display:'flex',gap:6,marginTop:6}}>
+                <button onClick={()=>addStock(p.id,1)} style={{background:'#dcfce7',border:0,padding:'4px 8px',borderRadius:6,fontSize:11,fontWeight:700}}>+1 Stock</button>
+                <button onClick={()=>addStock(p.id,5)} style={{background:'#dcfce7',border:0,padding:'4px 8px',borderRadius:6,fontSize:11,fontWeight:700}}>+5 Stock</button>
+                <button onClick={()=>addStock(p.id,10)} style={{background:'#dcfce7',border:0,padding:'4px 8px',borderRadius:6,fontSize:11,fontWeight:700}}>+10</button>
+              </div>
+            </div>
+            <div style={{display:'flex',flexDirection:'column',gap:6}}>
+              <button onClick={()=>startEdit(p)} style={{background:'black',color:'white',border:0,padding:'6px 12px',borderRadius:6,fontSize:12}}>Edit</button>
+              <button onClick={()=>deleteProd(p.id)} style={{background:'#fee2e2',border:0,padding:'6px 12px',borderRadius:6,fontSize:12}}>Delete</button>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 }
