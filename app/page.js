@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 
 export default function Shop(){
 const PAYSTACK_KEY="pk_live_e53e70211b051a607dea27a34fe32091d35917c2";
-const WA_NUMBER="2340000000000";
+const WA_NUMBER="2349061213237";
 const [products,setProducts]=useState([]);
 const [search,setSearch]=useState("");
 const [delivered,setDelivered]=useState(null);
