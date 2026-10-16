@@ -116,4 +116,25 @@ export default function Home() {
                 <button className="qtyBtn" onClick={()=>changeQty(p.id,1)}>+</button>
                 <span style={{fontSize:10,color:'#888',marginLeft:4}}>Qty</span>
               </div>
-              <button onClick={()=>handlePay(p)} disabled={pay
+              <button onClick={()=>handlePay(p)} disabled={paying===p.id} style={{width:'100%',marginTop:8,background:paying===p.id?'#999':'black',color:'white',border:0,padding:'11px',borderRadius:999,fontWeight:800,fontSize:12,cursor:'pointer'}}>
+                {paying===p.id?'Processing...':`Pay ₦${(Number(p.price)*(qtys[p.id]||1)).toLocaleString()}`}
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {activeDelivery && (
+        <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',display:'flex',alignItems:'center',justifyContent:'center',padding:20,zIndex:100}} onClick={()=>setActiveDelivery(null)}>
+          <div style={{background:'white',width:'100%',maxWidth:340,borderRadius:20,padding:20}} onClick={e=>e.stopPropagation()}>
+            <div style={{textAlign:'center',fontSize:34}}>✅</div>
+            <h3 style={{textAlign:'center',fontWeight:900}}>Payment Successful!</h3>
+            <div style={{textAlign:'center',fontSize:13,marginTop:6}}>{activeDelivery.product} - ₦{activeDelivery.price.toLocaleString()}</div>
+            <div style={{background:'#f0fdf4',border:'1px dashed #ccc',padding:10,borderRadius:8,fontSize:12,marginTop:12}}>{activeDelivery.deliveryInfo}</div>
+            <button onClick={()=>setActiveDelivery(null)} style={{width:'100%',marginTop:12,background:'black',color:'white',border:0,padding:12,borderRadius:999,fontWeight:800}}>Done</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
