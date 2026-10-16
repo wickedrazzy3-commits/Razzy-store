@@ -1,260 +1,113 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 
 export default function Admin(){
   const [products, setProducts] = useState([]);
-  const [name, setName] = useState('');
-  const [price, setPrice] = useState('');
-  const [oldPrice, setOldPrice] = useState('');
-  const [delivery, setDelivery] = useState('Logs will be delivered after purchase. Check My Orders');
-  const [img, setImg] = useState('');
-  const [logsText, setLogsText] = useState('');
-  const [previewCount, setPreviewCount] = useState(0);
-  const [isAdmin, setIsAdmin] = useState(false);
-  const [passInput, setPassInput] = useState('');
-  const [type, setType] = useState('digital');
-  const [manualStock, setManualStock] = useState('');
-
-  // EDIT STATES
-  const [editingId, setEditingId] = useState(null);
-  const [editName, setEditName] = useState('');
-  const [editPrice, setEditPrice] = useState('');
-  const [editOldPrice, setEditOldPrice] = useState('');
-  const [editDelivery, setEditDelivery] = useState('');
-  const [editImg, setEditImg] = useState('');
-  const [editLogsText, setEditLogsText] = useState('');
-  const [editPreviewCount, setEditPreviewCount] = useState(0);
-  const [editType, setEditType] = useState('digital');
-  const [editManualStock, setEditManualStock] = useState('');
-
-  const ADMIN_PASS = "razzy123";
+  const [auth, setAuth] = useState(false);
+  const [pass, setPass] = useState('');
+  const loadedRef = useRef(false);
 
   useEffect(()=>{
     try{
       const s = localStorage.getItem("razzy_products");
-      if(s) setProducts(JSON.parse(s));
+      if(s){
+        const p = JSON.parse(s);
+        if(Array.isArray(p)) setProducts(p);
+      }
     }catch{}
+    setTimeout(()=>{ loadedRef.current = true; }, 800);
   },[]);
 
-  const saveProducts = (newProducts) => {
-    setProducts(newProducts);
-    localStorage.setItem("razzy_products", JSON.stringify(newProducts));
+  useEffect(()=>{
+    if(!loadedRef.current) return;
+    try{ localStorage.setItem("razzy_products", JSON.stringify(products)); }catch{}
+  },[products]);
+
+  const login = () => {
+    if(pass==='admin123'){ setAuth(true); } else alert("Wrong! Use admin123");
   };
 
-  const parseLogs = (text) => {
-    if(!text.trim()) return [];
-    const blocks = text.split(/\n\s*\n/).filter(b=>b.trim().length>3);
-    let finalBlocks = blocks;
-    if(blocks.length <=1 && text.toLowerCase().includes("username")){
-      finalBlocks = text.split(/(?=Username\s*:-)/i).filter(b=>b.trim());
-    }
-    return finalBlocks.map(b=>b.trim()).filter(b=>b);
+  const updateField = (id, field, value) => {
+    setProducts(prev=>prev.map(p=>p.id===id?{...p, [field]: value}:p));
   };
 
-  useEffect(()=>{ setPreviewCount(parseLogs(logsText).length); },[logsText]);
-  useEffect(()=>{ setEditPreviewCount(parseLogs(editLogsText).length); },[editLogsText]);
-
-  const handleImageUpload = (e) => {
-    const file = e.target.files[0];
-    if(!file) return;
-    const reader = new FileReader();
-    reader.onload = (ev) => setImg(ev.target.result);
-    reader.readAsDataURL(file);
-  };
-  const handleEditImageUpload = (e) => {
-    const file = e.target.files[0];
-    if(!file) return;
-    const reader = new FileReader();
-    reader.onload = (ev) => setEditImg(ev.target.result);
-    reader.readAsDataURL(file);
+  const updateLogs = (id, text) => {
+    const logs = text.split('\n---\n').map(s=>s.trim()).filter(Boolean);
+    setProducts(prev=>prev.map(p=>p.id===id?{...p, logs, stock: p.type==='digital'? logs.length : p.stock}:p));
   };
 
-  const handleAddProduct = () => {
-    if(!name ||!price) return alert("Enter Name and Price");
-    if(!img) return alert("Upload Picture");
-
-    let logsArray = [];
-    let stock = 0;
-
-    if(type==='digital'){
-      logsArray = parseLogs(logsText);
-      if(logsArray.length===0) return alert("Paste at least 1 log for Digital");
-      stock = logsArray.length;
-    } else {
-      // physical
-      if(!manualStock) return alert("Enter Stock for Physical item");
-      stock = Number(manualStock);
-      logsArray = [];
-    }
-
-    const newProduct = {
+  const addProduct = () => {
+    const newP = {
       id: Date.now(),
-      name, price: Number(price), oldPrice: oldPrice? Number(oldPrice) : null,
-      img, stock, logs: logsArray, delivery, type
+      name:'New Product',
+      price:1000,
+      stock:10,
+      img:'https://i.imgur.com/8Km9tLL.png',
+      type:'digital',
+      description:'WRITE DESCRIPTION HERE - Buyers will see this on buyer site. Example: High quality... Fast delivery...',
+      logs:["Sample Account 1 - Username: test\nPassword: test123"]
     };
-    saveProducts([newProduct,...products]);
-    alert(`Added! Type: ${type} - Stock: ${stock}`);
-    setName(''); setPrice(''); setOldPrice(''); setImg(''); setLogsText(''); setManualStock('');
+    setProducts(prev=>[newP,...prev]);
+    alert("New product added! Now edit its description below and scroll down to save automatically");
   };
 
-  const startEdit = (p) => {
-    setEditingId(p.id);
-    setEditName(p.name);
-    setEditPrice(String(p.price));
-    setEditOldPrice(p.oldPrice? String(p.oldPrice) : '');
-    setEditDelivery(p.delivery);
-    setEditImg(p.img);
-    setEditType(p.type||'digital');
-    setEditManualStock(String(p.stock));
-    setEditLogsText(p.logs? p.logs.join("\n\n") : '');
-  };
+  const deleteProduct = (id) => { if(confirm("Delete product?")) setProducts(prev=>prev.filter(p=>p.id!==id)); };
 
-  const saveEdit = () => {
-    let logsArray = [];
-    let stock = 0;
-    if(editType==='digital'){
-      logsArray = parseLogs(editLogsText);
-      if(logsArray.length===0) return alert("Logs cannot be empty for Digital");
-      stock = logsArray.length;
-    } else {
-      stock = Number(editManualStock)||0;
-      logsArray = [];
-    }
-    const updated = products.map(p=>{
-      if(p.id===editingId){
-        return {...p, name: editName, price: Number(editPrice), oldPrice: editOldPrice? Number(editOldPrice):null, delivery: editDelivery, img: editImg, logs: logsArray, stock, type: editType}
-      }
-      return p;
-    });
-    saveProducts(updated);
-    setEditingId(null);
-    alert(`Updated! Type: ${editType} - Stock: ${stock}`);
-  };
+  const clearAll = () => { if(confirm("Clear ALL products? This cannot be undone")) { localStorage.removeItem("razzy_products"); setProducts([]); } };
 
-  const deleteProduct = (id) => {
-    if(!confirm("Delete?")) return;
-    saveProducts(products.filter(p=>p.id!==id));
-  };
-
-  if(!isAdmin){
+  if(!auth){
     return(
-      <div style={{minHeight:'100vh', display:'flex', alignItems:'center', justifyContent:'center', background:'#f5f5f7', fontFamily:'sans-serif'}}>
-        <div style={{background:'white', padding:24, borderRadius:12, width:320, border:'1px solid #ddd'}}>
-          <h3>Admin Login</h3>
-          <input type="password" value={passInput} onChange={e=>setPassInput(e.target.value)} placeholder="Enter admin password" style={{width:'100%', padding:10, borderRadius:8, border:'1px solid #ddd', marginTop:10}}/>
-          <button onClick={()=>{ if(passInput===ADMIN_PASS) setIsAdmin(true); else alert("Wrong"); }} style={{width:'100%', marginTop:10, background:'black', color:'white', padding:10, borderRadius:8, border:0, fontWeight:800}}>Login</button>
+      <div style={{minHeight:'100vh', display:'flex', alignItems:'center', justifyContent:'center', background:'#f5f5f7'}}>
+        <div style={{background:'white', padding:24, borderRadius:12, width:320}}>
+          <h2>Admin Dashboard</h2><p style={{fontSize:12}}>Password is admin123</p>
+          <input type="password" value={pass} onChange={e=>setPass(e.target.value)} placeholder="admin123" style={{width:'100%', padding:12, borderRadius:8, border:'1px solid #ddd', boxSizing:'border-box', marginTop:8}}/>
+          <button onClick={login} style={{width:'100%', background:'black', color:'white', padding:12, borderRadius:8, border:0, marginTop:12, fontWeight:800}}>Login as Admin</button>
+          <div style={{fontSize:11, marginTop:12}}>Buyer site: / <br/>Admin: /admin</div>
         </div>
       </div>
-    )
+    );
   }
 
   return(
-    <div style={{fontFamily:'sans-serif', background:'#f5f5f7', minHeight:'100vh', padding:16}}>
-      <div style={{display:'flex', justifyContent:'space-between'}}>
-        <h2>Admin Dashboard</h2>
-        <a href="/" style={{background:'black', color:'white', padding:'8px 14px', borderRadius:8, textDecoration:'none', fontSize:12}}>View Store</a>
+    <div style={{padding:16, fontFamily:'sans-serif', background:'#f5f5f7', minHeight:'100vh'}}>
+      <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', flexWrap:'wrap', gap:8}}>
+        <h2>Admin Dashboard ({products.length} items)</h2>
+        <div style={{display:'flex', gap:8}}>
+          <button onClick={addProduct} style={{background:'#16a34a', color:'white', border:0, padding:'10px 14px', borderRadius:6, fontWeight:800}}> + Add New Item</button>
+          <button onClick={clearAll} style={{background:'#fee2e2', color:'#dc2626', border:0, padding:'10px 14px', borderRadius:6}}>Clear All</button>
+          <a href="/" style={{background:'black', color:'white', padding:'10px 14px', borderRadius:6, textDecoration:'none'}}>Buyer Site</a>
+        </div>
+      </div>
+      <div style={{background:'#fff7ed', border:'1px solid #fed7aa', padding:10, borderRadius:8, marginTop:12, fontSize:12}}>
+        <b>How to add description:</b> Each product below has <b style={{color:'#ea580c'}}>Description</b> box (orange label). Type there. It saves automatically and shows on buyer site. Add as many items as you want - they will NOT disappear after refresh now (bug fixed).
       </div>
 
-      {/* ADD PRODUCT */}
-      <div style={{background:'white', border:'2px solid #16a34a', borderRadius:12, padding:16, marginTop:16}}>
-        <h3 style={{margin:0, color:'#16a34a'}}>UPLOAD NEW PRODUCT</h3>
+      {products.length===0 && <div style={{textAlign:'center', marginTop:40, color:'#888'}}>No products. Click Add New Item</div>}
 
-        {/* TYPE SELECTOR - DIFFERENTIATION */}
-        <div style={{display:'flex', gap:8, marginTop:12}}>
-          <button onClick={()=>setType('digital')} style={{flex:1, padding:10, borderRadius:8, border:type==='digital'?'2px solid #16a34a':'1px solid #ddd', background:type==='digital'?'#dcfce7':'white', fontWeight:800, fontSize:12}}>📱 DIGITAL (Logs)</button>
-          <button onClick={()=>setType('physical')} style={{flex:1, padding:10, borderRadius:8, border:type==='physical'?'2px solid #2563eb':'1px solid #ddd', background:type==='physical'?'#dbeafe':'white', fontWeight:800, fontSize:12}}>📦 PHYSICAL (Shipping)</button>
-        </div>
-
-        <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginTop:12}}>
-          <input value={name} onChange={e=>setName(e.target.value)} placeholder="Product Name" style={{padding:10, borderRadius:8, border:'1px solid #ddd'}}/>
-          <input value={price} onChange={e=>setPrice(e.target.value)} type="number" placeholder="Price" style={{padding:10, borderRadius:8, border:'1px solid #ddd'}}/>
-          <input value={oldPrice} onChange={e=>setOldPrice(e.target.value)} type="number" placeholder="Old Price" style={{padding:10, borderRadius:8, border:'1px solid #ddd'}}/>
-          <input value={delivery} onChange={e=>setDelivery(e.target.value)} placeholder={type==='digital'?'Delivery Note for logs':'Shipping Note'} style={{padding:10, borderRadius:8, border:'1px solid #ddd'}}/>
-        </div>
-
-        <div style={{marginTop:12}}>
-          <label style={{fontWeight:700, fontSize:12}}>Upload Picture</label>
-          <input type="file" accept="image/*" onChange={handleImageUpload} style={{display:'block', marginTop:6}}/>
-          {img && <img src={img} style={{width:80, height:80, objectFit:'cover', borderRadius:8, marginTop:8}}/>}
-        </div>
-
-        {type==='digital'? (
-          <div style={{marginTop:12}}>
-            <label style={{fontWeight:800, fontSize:13}}>📱 DIGITAL - Paste ALL Logs Here - Big Box</label>
-            <textarea value={logsText} onChange={e=>setLogsText(e.target.value)} placeholder={`Username:- lhemr
-Password:- temal
-2fa:- jehsyh62728
-How to login:- jsksieb
-
-Username:- pleats
-Password:- marek
-2fa:- jskjwh6262
-How to login:- nnajajdb`} style={{width:'100%', height:240, padding:12, borderRadius:8, border:'2px solid #16a34a', marginTop:8, fontSize:12, fontFamily:'monospace', boxSizing:'border-box'}}/>
-            <div style={{background:'#dcfce7', padding:8, borderRadius:6, marginTop:6, fontSize:12, fontWeight:700}}>Digital Detected: {previewCount} → Stock Auto {previewCount}</div>
-          </div>
-        ) : (
-          <div style={{marginTop:12, background:'#eff6ff', padding:12, borderRadius:8, border:'1px solid #2563eb'}}>
-            <label style={{fontWeight:800, fontSize:13}}>📦 PHYSICAL - Manual Stock</label>
-            <input value={manualStock} onChange={e=>setManualStock(e.target.value)} type="number" placeholder="Enter Stock Quantity e.g 50" style={{width:'100%', padding:10, borderRadius:8, border:'1px solid #ddd', marginTop:8, boxSizing:'border-box'}}/>
-            <div style={{fontSize:11, color:'#666', marginTop:6}}>Physical items don't need logs. Buyer will need to provide shipping address. Stock set manually.</div>
-          </div>
-        )}
-
-        <button onClick={handleAddProduct} style={{width:'100%', marginTop:12, background:'black', color:'white', padding:14, borderRadius:8, border:0, fontWeight:900}}>ADD {type.toUpperCase()} - Stock {type==='digital'? previewCount : manualStock||0}</button>
-      </div>
-
-      {/* EXISTING */}
-      <div style={{background:'white', borderRadius:12, padding:16, marginTop:20, border:'1px solid #ddd'}}>
-        <h3>Existing ({products.length}) - Digital & Physical</h3>
-        {products.map(p=>(
-          <div key={p.id} style={{border:'1px solid #eee', borderRadius:8, padding:10, marginTop:10, borderLeft: `4px solid ${p.type==='physical'?'#2563eb':'#16a34a'}`}}>
-            {editingId===p.id? (
-              <div style={{background:'#fffbeb', padding:12, borderRadius:8, border:'1px solid #f59e0b'}}>
-                <b>EDITING: {p.name}</b>
-                <div style={{display:'flex', gap:8, marginTop:8}}>
-                  <button onClick={()=>setEditType('digital')} style={{flex:1, padding:8, borderRadius:6, border:editType==='digital'?'2px solid #16a34a':'1px solid #ddd', background:editType==='digital'?'#dcfce7':'white', fontSize:11, fontWeight:700}}>DIGITAL</button>
-                  <button onClick={()=>setEditType('physical')} style={{flex:1, padding:8, borderRadius:6, border:editType==='physical'?'2px solid #2563eb':'1px solid #ddd', background:editType==='physical'?'#dbeafe':'white', fontSize:11, fontWeight:700}}>PHYSICAL</button>
-                </div>
-                <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginTop:10}}>
-                  <input value={editName} onChange={e=>setEditName(e.target.value)} style={{padding:8, borderRadius:6, border:'1px solid #ddd'}}/>
-                  <input value={editPrice} onChange={e=>setEditPrice(e.target.value)} type="number" style={{padding:8, borderRadius:6, border:'1px solid #ddd'}}/>
-                  <input value={editOldPrice} onChange={e=>setEditOldPrice(e.target.value)} type="number" placeholder="Old" style={{padding:8, borderRadius:6, border:'1px solid #ddd'}}/>
-                  <input value={editDelivery} onChange={e=>setEditDelivery(e.target.value)} style={{padding:8, borderRadius:6, border:'1px solid #ddd'}}/>
-                </div>
-                <input type="file" accept="image/*" onChange={handleEditImageUpload} style={{marginTop:8}}/>
-                {editType==='digital'? (
-                  <div style={{marginTop:10}}>
-                    <label style={{fontWeight:800, fontSize:12}}>EDIT DIGITAL LOGS - BIG BOX</label>
-                    <textarea value={editLogsText} onChange={e=>setEditLogsText(e.target.value)} style={{width:'100%', height:300, padding:12, borderRadius:8, border:'2px solid #000', marginTop:6, fontSize:12, fontFamily:'monospace', boxSizing:'border-box'}}/>
-                    <div style={{background:'#dcfce7', padding:6, borderRadius:4, marginTop:4, fontSize:11}}>Count: {editPreviewCount} → Stock {editPreviewCount}</div>
-                  </div>
-                ) : (
-                  <div style={{marginTop:10}}>
-                    <label style={{fontWeight:800, fontSize:12}}>PHYSICAL STOCK</label>
-                    <input value={editManualStock} onChange={e=>setEditManualStock(e.target.value)} type="number" style={{width:'100%', padding:10, borderRadius:8, border:'1px solid #ddd', marginTop:4, boxSizing:'border-box'}}/>
-                  </div>
-                )}
-                <div style={{display:'flex', gap:8, marginTop:10}}>
-                  <button onClick={saveEdit} style={{flex:1, background:'#16a34a', color:'white', padding:10, borderRadius:6, border:0, fontWeight:800}}>SAVE</button>
-                  <button onClick={()=>setEditingId(null)} style={{flex:1, background:'#eee', padding:10, borderRadius:6, border:0}}>Cancel</button>
-                </div>
-              </div>
-            ) : (
-              <div style={{display:'flex', gap:10}}>
-                <img src={p.img} style={{width:60, height:60, objectFit:'cover', borderRadius:6}}/>
-                <div style={{flex:1}}>
-                  <div style={{fontWeight:800, fontSize:13}}><span style={{background:p.type==='physical'?'#dbeafe':'#dcfce7', padding:'2px 6px', borderRadius:4, fontSize:10, marginRight:6}}>{p.type?.toUpperCase()||'DIGITAL'}</span>{p.name} - ₦{p.price} - Stock: {p.stock}</div>
-                  <div style={{fontSize:10, color:'#666', marginTop:4}}>{p.type==='digital'? `Logs: ${p.logs?.length||0} accounts` : `Physical item - Manual stock`}</div>
-                </div>
-                <div style={{display:'flex', flexDirection:'column', gap:6}}>
-                  <button onClick={()=>startEdit(p)} style={{background:'#dbeafe', color:'#2563eb', border:0, padding:'6px 12px', borderRadius:6, fontSize:11, fontWeight:700}}>Edit</button>
-                  <button onClick={()=>deleteProduct(p.id)} style={{background:'#fee2e2', color:'#dc2626', border:0, padding:'6px 12px', borderRadius:6, fontSize:11}}>Delete</button>
-                </div>
+      {products.map(p=>(
+        <div key={p.id} style={{background:'white', borderRadius:12, padding:16, marginTop:16, border:'1px solid #eee'}}>
+          <div style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}><b style={{fontSize:14}}>{p.name} (ID: {p.id}) - Available: {p.type==='digital'? (p.logs?.length||0) : p.stock}</b><button onClick={()=>deleteProduct(p.id)} style={{background:'#fee2e2', color:'#dc2626', border:0, padding:'6px 10px', borderRadius:4, fontSize:11}}>Delete</button></div>
+          <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, marginTop:12}}>
+            <div><label style={{fontSize:11, fontWeight:700}}>Name</label><input value={p.name} onChange={e=>updateField(p.id,'name',e.target.value)} style={{width:'100%', padding:10, borderRadius:6, border:'1px solid #ddd', boxSizing:'border-box', marginTop:4}}/></div>
+            <div><label style={{fontSize:11, fontWeight:700}}>Price ₦</label><input type="number" value={p.price} onChange={e=>updateField(p.id,'price',Number(e.target.value))} style={{width:'100%', padding:10, borderRadius:6, border:'1px solid #ddd', boxSizing:'border-box', marginTop:4}}/></div>
+            <div><label style={{fontSize:11, fontWeight:700}}>Image URL</label><input value={p.img} onChange={e=>updateField(p.id,'img',e.target.value)} style={{width:'100%', padding:10, borderRadius:6, border:'1px solid #ddd', boxSizing:'border-box', marginTop:4}}/></div>
+            <div><label style={{fontSize:11, fontWeight:700}}>Type</label><select value={p.type} onChange={e=>updateField(p.id,'type',e.target.value)} style={{width:'100%', padding:10, borderRadius:6, border:'1px solid #ddd', marginTop:4}}><option value="digital">digital (logs)</option><option value="physical">physical (stock)</option></select></div>
+            {p.type==='physical' && <div><label style={{fontSize:11, fontWeight:700}}>Stock Quantity</label><input type="number" value={p.stock} onChange={e=>updateField(p.id,'stock',Number(e.target.value))} style={{width:'100%', padding:10, borderRadius:6, border:'1px solid #ddd', boxSizing:'border-box', marginTop:4}}/></div>}
+            <div style={{gridColumn:'1 / -1', background:'#fff7ed', padding:12, borderRadius:8, border:'1px solid #fed7aa'}}>
+              <label style={{fontSize:12, fontWeight:800, color:'#ea580c'}}>★ DESCRIPTION - Buyers see this on product card</label>
+              <textarea value={p.description||''} onChange={e=>updateField(p.id,'description',e.target.value)} placeholder="Write full description here... e.g. High quality UK numbers, instant delivery, 100% verified, VPN guide included..." style={{width:'100%', padding:12, borderRadius:6, border:'1px solid #ea580c', minHeight:90, boxSizing:'border-box', marginTop:6, fontSize:13}}/>
+              <div style={{fontSize:10, color:'#666', marginTop:4}}>This shows under price on buyer site</div>
+            </div>
+            {p.type==='digital' && (
+              <div style={{gridColumn:'1 / -1'}}>
+                <label style={{fontSize:11, fontWeight:700}}>Logs / Accounts (Separate with line containing --- )</label>
+                <textarea value={(p.logs||[]).join('\n---\n')} onChange={e=>updateLogs(p.id,e.target.value)} placeholder="Account 1 details here&#10;---&#10;Account 2 details here" style={{width:'100%', padding:10, borderRadius:6, border:'1px solid #ddd', minHeight:140, boxSizing:'border-box', fontFamily:'monospace', fontSize:11, marginTop:4}}/>
+                <div style={{fontSize:11, color:'#16a34a', fontWeight:700}}>Total available: {(p.logs||[]).length} - This is stock for digital</div>
               </div>
             )}
           </div>
-        ))}
-      </div>
+        </div>
+      ))}
     </div>
   );
 }
