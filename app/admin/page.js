@@ -41,14 +41,17 @@ export default function Admin(){
     const publicUrl = data.publicUrl;
     setProducts(prev=>prev.map(p=>p.id===id?{...p, img: publicUrl}:p));
     await supabase.from('products').update({img: publicUrl}).eq('id', id);
-    alert("Image uploaded!");
+    alert("Image uploaded! Now visible to everyone");
   };
 
   const addProduct = async () => {
-    const newP = {id: Date.now(), name:'New Product', price:1000, stock:10, img:'https://i.imgur.com/8Km9tLL.png', type:'digital', description:'', logs:[]};
-    const { error } = await supabase.from('products').insert([newP]);
-    if(!error) setProducts(prev=>[newP,...prev]);
-    else alert(error.message);
+    const newP = {name:'New Product', price:1000, stock:10, img:'https://i.imgur.com/8Km9tLL.png', type:'digital', description:'', logs:[]};
+    const { data, error } = await supabase.from('products').insert([newP]).select();
+    if(!error && data && data[0]){
+      setProducts(prev=>[data[0],...prev]);
+    } else {
+      alert(error?.message || "Failed to add");
+    }
   };
 
   const deleteProduct = async (id) => {
