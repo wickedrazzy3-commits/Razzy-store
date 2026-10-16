@@ -1,12 +1,9 @@
 'use client';
 import { useState, useEffect } from 'react';
-
 const DEFAULT_PRODUCTS = [
-  {id:1, name:'UK WhatsApp Number', price:3000, oldPrice:4000, stock:20, img:'https://i.imgur.com/8Km9tLL.png', type:'digital', delivery:'Number will be delivered instantly', logs:["Username:- uk123\nPassword:- pass123\n2fa:- 123456"]},
+  {id:1, name:'UK WhatsApp Number', price:3000, oldPrice:4000, stock:20, img:'https://i.imgur.com/8Km9tLL.png', type:'digital', delivery:'Number will be delivered instantly', description:'High quality UK WhatsApp numbers ready to use. Instant delivery after payment. Full login details included with VPN guide.', logs:["Username:- uk123\nPassword:- pass123\n2fa:- 123456"]},
 ];
-
 const PAYSTACK_PUBLIC_KEY = "pk_live_e53e70211b051a607dea27a34fe32091d35917c2";
-
 export default function Home(){
   const [products, setProducts] = useState(DEFAULT_PRODUCTS);
   const [qtys, setQtys] = useState({});
@@ -22,15 +19,12 @@ export default function Home(){
   const [showAddressForm, setShowAddressForm] = useState(false);
   const [pendingProduct, setPendingProduct] = useState(null);
   const [addressData, setAddressData] = useState({fullName:'', phone:'', address:'', city:'', note:''});
-
-  // AUTH GATE - LIKE YOUR SCREENSHOT
   const [currentUser, setCurrentUser] = useState(null);
   const [authMode, setAuthMode] = useState('login');
   const [authForm, setAuthForm] = useState({name:'', email:'', password:''});
   const [rememberMe, setRememberMe] = useState(false);
   const [showForgot, setShowForgot] = useState(false);
   const [forgotEmail, setForgotEmail] = useState('');
-
   useEffect(()=>{
     try{
       const s = localStorage.getItem("razzy_products");
@@ -41,7 +35,7 @@ export default function Home(){
             try{
               let logs = item.logs; if(!logs) logs=[]; if(typeof logs==='string') logs=[logs]; if(!Array.isArray(logs)) logs=[];
               let stock = item.type==='digital'? logs.length : (Number(item.stock)||0);
-              return {...item, logs, stock: Number(stock)||0, type: item.type||'digital', price: Number(item.price)||0, img: item.img||'https://i.imgur.com/8Km9tLL.png'};
+              return {...item, logs, stock: Number(stock)||0, type: item.type||'digital', price: Number(item.price)||0, img: item.img||'https://i.imgur.com/8Km9tLL.png', description: item.description || ''};
             }catch{ return null; }
           }).filter(Boolean);
           if(fixed.length>0) setProducts(fixed);
@@ -57,30 +51,134 @@ export default function Home(){
       const script = document.createElement("script"); script.src = "https://js.paystack.co/v1/inline.js"; document.body.appendChild(script);
     }catch{}
   },[]);
-
   useEffect(()=>{ try{ localStorage.setItem("razzy_products", JSON.stringify(products)); }catch{} },[products]);
   useEffect(()=>{ try{ localStorage.setItem("razzy_wallet", String(wallet)); }catch{} },[wallet]);
   useEffect(()=>{ try{ localStorage.setItem("razzy_totalDeposited", String(totalDeposited)); }catch{} },[totalDeposited]);
   useEffect(()=>{ try{ localStorage.setItem("razzy_totalUsed", String(totalUsed)); }catch{} },[totalUsed]);
   useEffect(()=>{ try{ localStorage.setItem("razzy_totalItems", String(totalItems)); }catch{} },[totalItems]);
   useEffect(()=>{ try{ localStorage.setItem("razzy_orders", JSON.stringify(orders)); }catch{} },[orders]);
-
   const handleSignup = () => {
     if(!authForm.email ||!authForm.password) return alert("Fill email & password");
     if(authMode==='register' &&!authForm.name) return alert("Enter Full Name");
-    if(!authForm.email.includes("@")) return alert("Invalid email");
     const users = JSON.parse(localStorage.getItem("razzy_users")||"[]");
-    if(users.find(u=>u.email===authForm.email)) return alert("Email already exists, Login instead");
+    if(users.find(u=>u.email===authForm.email)) return alert("Email exists");
     const newUser = {name: authForm.name||authForm.email.split('@')[0], email: authForm.email, password: authForm.password};
     users.push(newUser); localStorage.setItem("razzy_users", JSON.stringify(users));
     localStorage.setItem("razzy_currentUser", JSON.stringify(newUser));
-    setCurrentUser(newUser); setEmail(newUser.email); setAuthForm({name:'', email:'', password:''});
+    setCurrentUser(newUser); setEmail(newUser.email);
   };
-
   const handleLogin = () => {
     if(!authForm.email ||!authForm.password) return alert("Fill email & password");
     const users = JSON.parse(localStorage.getItem("razzy_users")||"[]");
     const found = users.find(u=>u.email===authForm.email && u.password===authForm.password);
     if(!found) return alert("Wrong email or password");
     localStorage.setItem("razzy_currentUser", JSON.stringify(found));
-    if(rememberMe) localStorage.setItem
+    setCurrentUser(found); setEmail(found.email);
+  };
+  const handleForgot = () => {
+    const users = JSON.parse(localStorage.getItem("razzy_users")||"[]");
+    const found = users.find(u=>u.email===forgotEmail);
+    if(!found) return alert("No account"); alert(`Your password: ${found.password}`); setShowForgot(false);
+  };
+  const handleLogout = () => { localStorage.removeItem("razzy_currentUser"); setCurrentUser(null); };
+  const changeQty = (id, delta) => {
+    const product = products.find(p=>p.id===id); if(!product) return;
+    const available = product.type==='digital'? (Array.isArray(product.logs)? product.logs.length : 0) : (Number(product.stock)||0);
+    if(available<=0) return;
+    setQtys(prev=>{
+      const cur=prev[id]||1; let next=cur+delta; if(next<1) next=1;
+      if(next>available){ alert(`Only ${available} available!`); return {...prev,[id]:available}; }
+      return {...prev,[id]:next};
+    });
+  };
+  const handleDeposit = () => {
+    const amt = Number(depositAmt); if(!amt||amt<100) return alert("Min ₦100");
+    if(!window.PaystackPop) return alert("Paystack loading...");
+    const handler = window.PaystackPop.setup({
+      key: PAYSTACK_PUBLIC_KEY, email: email, amount: amt*100, currency:"NGN", ref:"RAZZY_"+Date.now(),
+      callback: function(response){ const credit=amt-50; setWallet(p=>p+credit); setTotalDeposited(p=>p+amt); setDepositAmt(''); setShowDeposit(false); alert(`SUCCESS ₦${credit} credited`); },
+      onClose: function(){ alert("Cancelled"); }
+    }); handler.openIframe();
+  };
+  const startBuy = (product) => {
+    const qty=qtys[product.id]||1; const available=product.type==='digital'? (Array.isArray(product.logs)? product.logs.length:0) : (Number(product.stock)||0);
+    const total=Number(product.price)*qty;
+    if(available<=0) return alert("OUT OF STOCK!"); if(qty>available) return alert(`Only ${available} left`);
+    if(wallet<total) return alert(`Insufficient! Have ₦${wallet} need ₦${total}`);
+    if(product.type==='physical'){ setPendingProduct({product, qty, total}); setShowAddressForm(true); } else confirmBuyDigital(product, qty, total);
+  };
+  const confirmBuyDigital = (product, qty, total) => {
+    if(!confirm(`Buy ${product.name} x${qty} = ₦${total}?`)) return;
+    const availableLogs=Array.isArray(product.logs)? product.logs:[]; const boughtLogs=availableLogs.slice(0,qty); const remainingLogs=availableLogs.slice(qty);
+    const newOrder={id:Date.now(), productName:product.name, price:product.price, qty, total, type:'digital', logs:boughtLogs, date:new Date().toLocaleString(), img:product.img};
+    setOrders(p=>[newOrder,...p]); setWallet(p=>p-total); setTotalUsed(p=>p+total); setTotalItems(p=>p+qty);
+    setProducts(prev=>prev.map(p=>p.id===product.id?{...p, logs:remainingLogs, stock:remainingLogs.length}:p));
+  };
+  const confirmBuyPhysical = () => {
+    if(!addressData.fullName||!addressData.phone||!addressData.address) return alert("Fill Name, Phone, Address");
+    const {product, qty, total}=pendingProduct;
+    const newOrder={id:Date.now(), productName:product.name, price:product.price, qty, total, type:'physical', address:{...addressData}, date:new Date().toLocaleString(), img:product.img, status:'Processing'};
+    setOrders(p=>[newOrder,...p]); setWallet(p=>p-total); setTotalUsed(p=>p+total); setTotalItems(p=>p+qty);
+    setProducts(prev=>prev.map(p=>p.id===product.id?{...p, stock:(Number(p.stock)||0)-qty}:p));
+    setShowAddressForm(false); setAddressData({fullName:'', phone:'', address:'', city:'', note:''}); setPendingProduct(null);
+  };
+  const copyLog = (t) => { try{ navigator.clipboard.writeText(t); alert("Copied!"); }catch{ alert(t); } };
+  if(!currentUser){
+    return(
+      <div style={{minHeight:'100vh', background:'#f9fafb', display:'flex', alignItems:'center', justifyContent:'center', padding:16, fontFamily:'sans-serif'}}>
+        <div style={{background:'white', width:'100%', maxWidth:380, borderRadius:16, padding:24, boxShadow:'0 4px 24px rgba(0,0,0,0.08)'}}>
+          {authMode==='login'? (
+            <>
+              <div style={{textAlign:'center', marginBottom:24}}><h1 style={{color:'#ea580c', margin:0, fontSize:28, fontWeight:800}}>Welcome Back</h1><p style={{color:'#6b7280', margin:'4px 0 0', fontSize:14}}>Login to your account</p></div>
+              <div style={{display:'flex', flexDirection:'column', gap:16}}>
+                <div><label style={{fontSize:14, fontWeight:600, display:'block', marginBottom:6}}>Email</label><input value={authForm.email} onChange={e=>setAuthForm({...authForm, email:e.target.value})} type="email" style={{width:'100%', padding:'12px 14px', borderRadius:8, border:'1px solid #d1d5db', boxSizing:'border-box'}}/></div>
+                <div><label style={{fontSize:14, fontWeight:600, display:'block', marginBottom:6}}>Password</label><input value={authForm.password} onChange={e=>setAuthForm({...authForm, password:e.target.value})} type="password" style={{width:'100%', padding:'12px 14px', borderRadius:8, border:'1px solid #d1d5db', boxSizing:'border-box'}}/></div>
+                <div style={{display:'flex', justifyContent:'space-between'}}><label style={{display:'flex', alignItems:'center', gap:6, fontSize:13}}><input type="checkbox" checked={rememberMe} onChange={e=>setRememberMe(e.target.checked)}/> Remember me</label><span onClick={()=>setShowForgot(true)} style={{fontSize:13, color:'#ea580c', cursor:'pointer'}}>Forgot Password?</span></div>
+                <button onClick={handleLogin} style={{background:'#ea580c', color:'white', border:0, padding:13, borderRadius:8, fontWeight:700, width:'100%'}}>Log in</button>
+                <div style={{textAlign:'center', fontSize:13}}>Don't have account? <span onClick={()=>setAuthMode('register')} style={{color:'#ea580c', fontWeight:600, cursor:'pointer'}}>Register</span></div>
+              </div>
+            </>
+          ) : (
+            <>
+              <div style={{textAlign:'center', marginBottom:24}}><h1 style={{color:'#ea580c', margin:0, fontSize:28, fontWeight:800}}>Create Account</h1><p style={{color:'#6b7280', margin:'4px 0 0', fontSize:14}}>Sign up to get started</p></div>
+              <div style={{display:'flex', flexDirection:'column', gap:14}}>
+                <div><label style={{fontSize:14, fontWeight:600, display:'block', marginBottom:6}}>Full Name</label><input value={authForm.name} onChange={e=>setAuthForm({...authForm, name:e.target.value})} style={{width:'100%', padding:'12px 14px', borderRadius:8, border:'1px solid #d1d5db', boxSizing:'border-box'}}/></div>
+                <div><label style={{fontSize:14, fontWeight:600, display:'block', marginBottom:6}}>Email</label><input value={authForm.email} onChange={e=>setAuthForm({...authForm, email:e.target.value})} type="email" style={{width:'100%', padding:'12px 14px', borderRadius:8, border:'1px solid #d1d5db', boxSizing:'border-box'}}/></div>
+                <div><label style={{fontSize:14, fontWeight:600, display:'block', marginBottom:6}}>Password</label><input value={authForm.password} onChange={e=>setAuthForm({...authForm, password:e.target.value})} type="password" style={{width:'100%', padding:'12px 14px', borderRadius:8, border:'1px solid #d1d5db', boxSizing:'border-box'}}/></div>
+                <button onClick={handleSignup} style={{background:'#ea580c', color:'white', border:0, padding:13, borderRadius:8, fontWeight:700, width:'100%'}}>Register</button>
+                <div style={{textAlign:'center', fontSize:13}}>Have account? <span onClick={()=>setAuthMode('login')} style={{color:'#ea580c', fontWeight:600, cursor:'pointer'}}>Login</span></div>
+              </div>
+            </>
+          )}
+        </div>
+        {showForgot && (<div style={{position:'fixed', inset:0, background:'rgba(0,0,0,0.5)', display:'flex', alignItems:'center', justifyContent:'center', padding:16}}><div style={{background:'white', padding:20, borderRadius:12, width:'100%', maxWidth:340}}><h3 style={{margin:0}}>Reset</h3><input value={forgotEmail} onChange={e=>setForgotEmail(e.target.value)} placeholder="Your email" style={{width:'100%', padding:12, marginTop:10, borderRadius:8, border:'1px solid #ddd', boxSizing:'border-box'}}/><div style={{display:'flex', gap:8, marginTop:12}}><button onClick={handleForgot} style={{flex:1, background:'#ea580c', color:'white', border:0, padding:10, borderRadius:8}}>Recover</button><button onClick={()=>setShowForgot(false)} style={{flex:1, background:'#eee', border:0, padding:10, borderRadius:8}}>Cancel</button></div></div></div>)}
+      </div>
+    );
+  }
+  return(
+    <div style={{fontFamily:'sans-serif', background:'#f5f5f7', minHeight:'100vh'}}>
+      <div style={{background:'black', color:'white', padding:12, display:'flex', justifyContent:'space-between', alignItems:'center', position:'sticky', top:0, zIndex:10}}><b>RAZZY STORE</b><div style={{display:'flex', gap:6}}><div style={{background:'#222', padding:'6px 8px', borderRadius:6, fontSize:10}}>Wallet: <b style={{color:'#16a34a'}}>₦{wallet}</b></div><button onClick={()=>setShowOrders(true)} style={{background:'white', color:'black', border:0, padding:'6px 8px', borderRadius:6, fontSize:10, fontWeight:800}}>Orders ({orders.length})</button><button onClick={handleLogout} style={{background:'#dc2626', color:'white', border:0, padding:'6px 8px', borderRadius:6, fontSize:10, fontWeight:800}}>Logout</button><button onClick={()=>setShowDeposit(true)} style={{background:'#16a34a', color:'white', border:0, padding:'6px 8px', borderRadius:6, fontSize:10, fontWeight:800}}>Deposit</button></div></div>
+      <div style={{padding:12}}><div style={{background:'white', borderRadius:12, padding:12, display:'grid', gridTemplateColumns:'repeat(3, 1fr)', gap:10, border:'1px solid #eee'}}><div style={{background:'#f0fdf4', borderRadius:8, padding:10, textAlign:'center'}}><div style={{fontSize:10}}>DEPOSITED</div><div style={{fontSize:13, fontWeight:900, color:'#16a34a'}}>₦{totalDeposited}</div></div><div style={{background:'#fef2f2', borderRadius:8, padding:10, textAlign:'center'}}><div style={{fontSize:10}}>USED</div><div style={{fontSize:13, fontWeight:900, color:'#dc2626'}}>₦{totalUsed}</div></div><div style={{background:'#eff6ff', borderRadius:8, padding:10, textAlign:'center'}}><div style={{fontSize:10}}>ITEMS</div><div style={{fontSize:13, fontWeight:900, color:'#2563eb'}}>{totalItems}</div></div></div></div>
+      {showDeposit && (<div style={{position:'fixed', inset:0, background:'rgba(0,0,0,0.6)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:50, padding:16}}><div style={{background:'white', padding:20, borderRadius:12, width:'100%', maxWidth:360}}><h3 style={{margin:0}}>Deposit Live</h3><input value={email} onChange={e=>setEmail(e.target.value)} placeholder="Email" style={{width:'100%', padding:12, marginTop:12, borderRadius:8, border:'1px solid #ddd', boxSizing:'border-box'}}/><input type="number" value={depositAmt} onChange={e=>setDepositAmt(e.target.value)} placeholder="Amount" style={{width:'100%', padding:12, marginTop:8, borderRadius:8, border:'1px solid #ddd', boxSizing:'border-box'}}/><div style={{display:'flex', gap:8, marginTop:12}}><button onClick={handleDeposit} style={{flex:1, background:'black', color:'white', padding:12, borderRadius:8, border:0, fontWeight:800}}>Pay Live</button><button onClick={()=>setShowDeposit(false)} style={{flex:1, background:'#eee', padding:12, borderRadius:8, border:0}}>Cancel</button></div></div></div>)}
+      {showAddressForm && (<div style={{position:'fixed', inset:0, background:'rgba(0,0,0,0.6)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:60, padding:16}}><div style={{background:'white', padding:20, borderRadius:12, width:'100%', maxWidth:380}}><h3 style={{margin:0}}>Delivery Details</h3><input value={addressData.fullName} onChange={e=>setAddressData({...addressData, fullName:e.target.value})} placeholder="Full Name" style={{width:'100%', padding:10, marginTop:10, borderRadius:8, border:'1px solid #ddd', boxSizing:'border-box'}}/><input value={addressData.phone} onChange={e=>setAddressData({...addressData, phone:e.target.value})} placeholder="Phone" style={{width:'100%', padding:10, marginTop:8, borderRadius:8, border:'1px solid #ddd', boxSizing:'border-box'}}/><input value={addressData.address} onChange={e=>setAddressData({...addressData, address:e.target.value})} placeholder="Address" style={{width:'100%', padding:10, marginTop:8, borderRadius:8, border:'1px solid #ddd', boxSizing:'border-box'}}/><input value={addressData.city} onChange={e=>setAddressData({...addressData, city:e.target.value})} placeholder="City/State" style={{width:'100%', padding:10, marginTop:8, borderRadius:8, border:'1px solid #ddd', boxSizing:'border-box'}}/><textarea value={addressData.note} onChange={e=>setAddressData({...addressData, note:e.target.value})} placeholder="Note" style={{width:'100%', padding:10, marginTop:8, borderRadius:8, border:'1px solid #ddd', boxSizing:'border-box', height:60}}/><div style={{display:'flex', gap:8, marginTop:12}}><button onClick={confirmBuyPhysical} style={{flex:1, background:'black', color:'white', padding:12, borderRadius:8, border:0, fontWeight:800}}>Confirm</button><button onClick={()=>setShowAddressForm(false)} style={{flex:1, background:'#eee', padding:12, borderRadius:8, border:0}}>Cancel</button></div></div></div>)}
+      {showOrders && (<div style={{position:'fixed', inset:0, background:'rgba(0,0,0,0.6)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:70, padding:12}}><div style={{background:'white', padding:16, borderRadius:12, width:'100%', maxWidth:500, maxHeight:'85vh', display:'flex', flexDirection:'column'}}><div style={{display:'flex', justifyContent:'space-between'}}><h3 style={{margin:0}}>My Orders</h3><button onClick={()=>setShowOrders(false)} style={{background:'#eee', border:0, padding:'6px 10px', borderRadius:6}}>X</button></div><div style={{marginTop:12, overflow:'auto', flex:1}}>{orders.length===0? <div style={{textAlign:'center', color:'#888', padding:20, fontSize:12}}>No purchases</div> : orders.map(order=>(<div key={order.id} style={{border:'1px solid #eee', borderRadius:8, padding:10, marginTop:10}}><div style={{fontWeight:800, fontSize:12}}>{order.productName} x{order.qty} - ₦{order.total}</div><div style={{fontSize:11, color:'#666'}}>{order.date}</div>{order.type==='digital'? <div style={{marginTop:8}}>{(order.logs||[]).map((log, idx)=>(<div key={idx} style={{background:'#f9fafb', border:'1px solid #ddd', borderRadius:6, padding:8, marginTop:6}}><div style={{fontSize:11, whiteSpace:'pre-wrap'}}>{log}</div><button onClick={()=>copyLog(log)} style={{marginTop:6, background:'black', color:'white', border:0, padding:'6px 12px', borderRadius:6, fontSize:11, width:'100%'}}>Copy</button></div>))}</div> : <div style={{marginTop:8, background:'#eff6ff', padding:8, borderRadius:6, fontSize:11}}>Name: {order.address?.fullName}<br/>Phone: {order.address?.phone}<br/>Address: {order.address?.address}</div>}</div>))}</div></div></div>)}
+      <div style={{padding:16, display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(160px, 1fr))', gap:12}}>
+        {products.map(p=>{
+          const available=p.type==='digital'? (Array.isArray(p.logs)? p.logs.length:0) : (Number(p.stock)||0);
+          const currentQty=qtys[p.id]||1; const isOut=available<=0;
+          return(
+          <div key={p.id} style={{background:'white', borderRadius:12, overflow:'hidden', border:'1px solid #eee', opacity:isOut?0.6:1}}>
+            <img src={p.img} style={{width:'100%', height:140, objectFit:'cover'}}/>
+            <div style={{padding:10}}>
+              <div style={{fontWeight:700, fontSize:12}}>{p.name}</div><div style={{fontSize:12, marginTop:4}}><b>₦{p.price}</b></div>
+              <div style={{fontSize:11, color:'#4b5563', marginTop:6, lineHeight:'14px', background:'#f9fafb', padding:6, borderRadius:6, border:'1px solid #f0f0f0', display:'-webkit-box', WebkitLineClamp:3, WebkitBoxOrient:'vertical', overflow:'hidden'}}>{p.description||'No description added by admin'}</div>
+              <div style={{fontSize:10, color:isOut?'red':'green', fontWeight:700, marginTop:6}}>{isOut? 'SOLD OUT':`Available: ${available}`}</div>
+              <div style={{display:'flex', alignItems:'center', gap:8, marginTop:8, justifyContent:'center', background:'#f5f5f7', borderRadius:6, padding:4}}><button onClick={()=>changeQty(p.id,-1)} style={{border:0, background:'white', width:26, height:26, borderRadius:4}}>-</button><span style={{fontSize:12, fontWeight:700}}>{isOut?0:currentQty}/{available}</span><button onClick={()=>changeQty(p.id,1)} style={{border:0, background:'white', width:26, height:26, borderRadius:4}}>+</button></div>
+              <button onClick={()=>startBuy(p)} disabled={isOut} style={{width:'100%', marginTop:8, background:isOut?'#ccc':'black', color:'white', border:0, padding:10, borderRadius:6, fontSize:12, fontWeight:800}}>{isOut? 'Sold Out':'Buy Now'}</button>
+            </div>
+          </div>
+        )})}
+      </div>
+    </div>
+  );
+}
