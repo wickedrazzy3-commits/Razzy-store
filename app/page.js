@@ -1,11 +1,11 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 const DEFAULT_PRODUCTS = [
   {id:1, name:'UK WhatsApp Number', price:3000, oldPrice:4000, stock:20, img:'https://i.imgur.com/8Km9tLL.png', type:'digital', delivery:'Number will be delivered instantly', description:'High quality UK WhatsApp numbers ready to use. Instant delivery after payment. Full login details included with VPN guide.', logs:["Username:- uk123\nPassword:- pass123\n2fa:- 123456"]},
 ];
 const PAYSTACK_PUBLIC_KEY = "pk_live_e53e70211b051a607dea27a34fe32091d35917c2";
 export default function Home(){
-  const [products, setProducts] = useState(DEFAULT_PRODUCTS);
+  const [products, setProducts] = useState([]);
   const [qtys, setQtys] = useState({});
   const [wallet, setWallet] = useState(0);
   const [showDeposit, setShowDeposit] = useState(false);
@@ -25,6 +25,8 @@ export default function Home(){
   const [rememberMe, setRememberMe] = useState(false);
   const [showForgot, setShowForgot] = useState(false);
   const [forgotEmail, setForgotEmail] = useState('');
+  const loadedRef = useRef(false);
+
   useEffect(()=>{
     try{
       const s = localStorage.getItem("razzy_products");
@@ -38,9 +40,10 @@ export default function Home(){
               return {...item, logs, stock: Number(stock)||0, type: item.type||'digital', price: Number(item.price)||0, img: item.img||'https://i.imgur.com/8Km9tLL.png', description: item.description || ''};
             }catch{ return null; }
           }).filter(Boolean);
-          if(fixed.length>0) setProducts(fixed);
-        }
-      }
+          if(fixed.length>0){ setProducts(fixed); }
+          else { setProducts(DEFAULT_PRODUCTS); }
+        } else { setProducts(DEFAULT_PRODUCTS); }
+      } else { setProducts(DEFAULT_PRODUCTS); }
       const w = localStorage.getItem("razzy_wallet"); if(w) setWallet(Number(w)||0);
       const td = localStorage.getItem("razzy_totalDeposited"); if(td) setTotalDeposited(Number(td)||0);
       const tu = localStorage.getItem("razzy_totalUsed"); if(tu) setTotalUsed(Number(tu)||0);
@@ -49,14 +52,17 @@ export default function Home(){
       const ord = localStorage.getItem("razzy_orders"); if(ord) setOrders(JSON.parse(ord)||[]);
       const user = localStorage.getItem("razzy_currentUser"); if(user) setCurrentUser(JSON.parse(user));
       const script = document.createElement("script"); script.src = "https://js.paystack.co/v1/inline.js"; document.body.appendChild(script);
-    }catch{}
+    }catch{ setProducts(DEFAULT_PRODUCTS); }
+    setTimeout(()=>{ loadedRef.current = true; }, 500);
   },[]);
-  useEffect(()=>{ try{ localStorage.setItem("razzy_products", JSON.stringify(products)); }catch{} },[products]);
-  useEffect(()=>{ try{ localStorage.setItem("razzy_wallet", String(wallet)); }catch{} },[wallet]);
-  useEffect(()=>{ try{ localStorage.setItem("razzy_totalDeposited", String(totalDeposited)); }catch{} },[totalDeposited]);
-  useEffect(()=>{ try{ localStorage.setItem("razzy_totalUsed", String(totalUsed)); }catch{} },[totalUsed]);
-  useEffect(()=>{ try{ localStorage.setItem("razzy_totalItems", String(totalItems)); }catch{} },[totalItems]);
-  useEffect(()=>{ try{ localStorage.setItem("razzy_orders", JSON.stringify(orders)); }catch{} },[orders]);
+
+  useEffect(()=>{ if(!loadedRef.current) return; try{ localStorage.setItem("razzy_products", JSON.stringify(products)); }catch{} },[products]);
+  useEffect(()=>{ if(!loadedRef.current) return; try{ localStorage.setItem("razzy_wallet", String(wallet)); }catch{} },[wallet]);
+  useEffect(()=>{ if(!loadedRef.current) return; try{ localStorage.setItem("razzy_totalDeposited", String(totalDeposited)); }catch{} },[totalDeposited]);
+  useEffect(()=>{ if(!loadedRef.current) return; try{ localStorage.setItem("razzy_totalUsed", String(totalUsed)); }catch{} },[totalUsed]);
+  useEffect(()=>{ if(!loadedRef.current) return; try{ localStorage.setItem("razzy_totalItems", String(totalItems)); }catch{} },[totalItems]);
+  useEffect(()=>{ if(!loadedRef.current) return; try{ localStorage.setItem("razzy_orders", JSON.stringify(orders)); }catch{} },[orders]);
+
   const handleSignup = () => {
     if(!authForm.email ||!authForm.password) return alert("Fill email & password");
     if(authMode==='register' &&!authForm.name) return alert("Enter Full Name");
@@ -171,7 +177,7 @@ export default function Home(){
             <img src={p.img} style={{width:'100%', height:140, objectFit:'cover'}}/>
             <div style={{padding:10}}>
               <div style={{fontWeight:700, fontSize:12}}>{p.name}</div><div style={{fontSize:12, marginTop:4}}><b>₦{p.price}</b></div>
-              <div style={{fontSize:11, color:'#4b5563', marginTop:6, lineHeight:'14px', background:'#f9fafb', padding:6, borderRadius:6, border:'1px solid #f0f0f0', display:'-webkit-box', WebkitLineClamp:3, WebkitBoxOrient:'vertical', overflow:'hidden'}}>{p.description||'No description added by admin'}</div>
+              <div style={{fontSize:11, color:'#4b5563', marginTop:6, lineHeight:'14px', background:'#f9fafb', padding:6, borderRadius:6, border:'1px solid #f0f0f0'}}>{p.description||'No description'}</div>
               <div style={{fontSize:10, color:isOut?'red':'green', fontWeight:700, marginTop:6}}>{isOut? 'SOLD OUT':`Available: ${available}`}</div>
               <div style={{display:'flex', alignItems:'center', gap:8, marginTop:8, justifyContent:'center', background:'#f5f5f7', borderRadius:6, padding:4}}><button onClick={()=>changeQty(p.id,-1)} style={{border:0, background:'white', width:26, height:26, borderRadius:4}}>-</button><span style={{fontSize:12, fontWeight:700}}>{isOut?0:currentQty}/{available}</span><button onClick={()=>changeQty(p.id,1)} style={{border:0, background:'white', width:26, height:26, borderRadius:4}}>+</button></div>
               <button onClick={()=>startBuy(p)} disabled={isOut} style={{width:'100%', marginTop:8, background:isOut?'#ccc':'black', color:'white', border:0, padding:10, borderRadius:6, fontSize:12, fontWeight:800}}>{isOut? 'Sold Out':'Buy Now'}</button>
