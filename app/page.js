@@ -5,7 +5,6 @@ const DEFAULT_PRODUCTS = [
   {id:1, name:'UK WhatsApp Number', price:3000, oldPrice:4000, stock:20, img:'https://i.imgur.com/8Km9tLL.png', type:'digital', delivery:'Number will be delivered instantly', logs:["Username:- uk123\nPassword:- pass123\n2fa:- 123456\nHow to login:- Use VPN"]},
 ];
 
-// YOUR LIVE KEY - REAL DEPOSIT NOW
 const PAYSTACK_PUBLIC_KEY = "pk_live_e53e70211b051a607dea27a34fe32091d35917c2";
 
 export default function Home(){
@@ -47,14 +46,26 @@ export default function Home(){
   useEffect(()=>{ localStorage.setItem("razzy_totalItems", String(totalItems)); },[totalItems]);
   useEffect(()=>{ localStorage.setItem("razzy_orders", JSON.stringify(orders)); },[orders]);
 
+  // FIXED: Cannot buy more than available stock
   const changeQty = (id, delta) => {
-    setQtys(prev=>{ const cur=prev[id]||1; const next=Math.max(1,Math.min(10,cur+delta)); return {...prev,[id]:next}; });
+    const product = products.find(p=>p.id===id);
+    const available = product? (product.type==='digital'? (product.logs?.length||product.stock) : product.stock) : 10;
+    setQtys(prev=>{
+      const cur=prev[id]||1;
+      let next = cur+delta;
+      if(next < 1) next = 1;
+      if(next > available){
+        if(cur < available) next = available;
+        else { alert(`Only ${available} available for ${product?.name}!`); return prev; }
+      }
+      return {...prev,[id]:next};
+    });
   };
 
   const handleDeposit = () => {
     const amt = Number(depositAmt);
     if(!amt || amt < 100) return alert("Enter minimum ₦100");
-    if(!email ||!email.includes("@")) return alert("Enter valid email for receipt");
+    if(!email ||!email.includes("@")) return alert("Enter valid email");
     const FEE = 50;
     if(amt <= FEE) return alert(`Minimum is ₦${FEE+100}`);
     if(!window.PaystackPop) return alert("Paystack loading... wait 2 secs");
@@ -70,19 +81,21 @@ export default function Home(){
         setWallet(prev=>prev+credit);
         setTotalDeposited(prev=>prev+amt);
         setDepositAmt(''); setShowDeposit(false);
-        alert(`SUCCESS! Ref: ${response.reference}\nPaid ₦${amt} - ₦${FEE} fee = ₦${credit} credited`);
+        alert(`SUCCESS! Ref: ${response.reference}\nPaid ₦${amt} - ₦${FEE} = ₦${credit} credited`);
       },
       onClose: function(){ alert("Payment cancelled"); }
     });
     handler.openIframe();
   };
 
+  // FIXED: Check stock before buy
   const startBuy = (product) => {
     const qty = qtys[product.id]||1;
+    const available = product.type==='digital'? (product.logs?.length||0) : product.stock;
     const total = product.price * qty;
-    if(product.stock < qty) return alert(`Out of stock! Only ${product.stock} left`);
+    if(available <=0) return alert(`OUT OF STOCK! ${product.name} sold out`);
+    if(qty > available) return alert(`Cannot buy ${qty}. Only ${available} left for ${product.name}`);
     if(wallet < total) return alert(`Insufficient! Have ₦${wallet} need ₦${total}. Deposit first.`);
-
     if(product.type==='physical'){
       setPendingProduct({product, qty, total});
       setShowAddressForm(true);
@@ -93,65 +106,33 @@ export default function Home(){
 
   const confirmBuyDigital = (product, qty, total) => {
     if(!confirm(`Buy ${product.name} x${qty} = ₦${total}?\nBalance after: ₦${wallet-total}`)) return;
-
-    // Take logs from product
     const availableLogs = product.logs || [];
     const boughtLogs = availableLogs.slice(0, qty);
     const remainingLogs = availableLogs.slice(qty);
-
-    const newOrder = {
-      id: Date.now(),
-      productName: product.name,
-      price: product.price,
-      qty,
-      total,
-      type: 'digital',
-      logs: boughtLogs,
-      date: new Date().toLocaleString(),
-      img: product.img
-    };
-
+    const newOrder = {id: Date.now(), productName: product.name, price: product.price, qty, total, type: 'digital', logs: boughtLogs, date: new Date().toLocaleString(), img: product.img};
     setOrders(prev=>[newOrder,...prev]);
     setWallet(prev=>prev-total);
     setTotalUsed(prev=>prev+total);
     setTotalItems(prev=>prev+qty);
     setProducts(prev=>prev.map(p=>p.id===product.id?{...p, logs: remainingLogs, stock: remainingLogs.length}:p));
-    alert(`Digital Purchase Successful! Check My Orders to copy your logs`);
+    alert(`Digital Success! Check My Orders to copy logs`);
   };
 
   const confirmBuyPhysical = () => {
-    if(!addressData.fullName ||!addressData.phone ||!addressData.address) return alert("Fill Full Name, Phone, and Address");
+    if(!addressData.fullName ||!addressData.phone ||!addressData.address) return alert("Fill Full Name, Phone, Address");
     const {product, qty, total} = pendingProduct;
-    if(!confirm(`Buy ${product.name} x${qty} = ₦${total} to deliver to ${addressData.address}?`)) return;
-
-    const newOrder = {
-      id: Date.now(),
-      productName: product.name,
-      price: product.price,
-      qty,
-      total,
-      type: 'physical',
-      address: {...addressData},
-      date: new Date().toLocaleString(),
-      img: product.img,
-      status: 'Processing - Will be shipped'
-    };
-
+    if(!confirm(`Buy ${product.name} x${qty} = ₦${total} to ${addressData.address}?`)) return;
+    const newOrder = {id: Date.now(), productName: product.name, price: product.price, qty, total, type: 'physical', address: {...addressData}, date: new Date().toLocaleString(), img: product.img, status: 'Processing - Will be shipped'};
     setOrders(prev=>[newOrder,...prev]);
     setWallet(prev=>prev-total);
     setTotalUsed(prev=>prev+total);
     setTotalItems(prev=>prev+qty);
     setProducts(prev=>prev.map(p=>p.id===product.id?{...p, stock: p.stock - qty}:p));
-    setShowAddressForm(false);
-    setAddressData({fullName:'', phone:'', address:'', city:'', note:''});
-    setPendingProduct(null);
-    alert(`Physical Order Placed! Check My Orders for delivery details`);
+    setShowAddressForm(false); setAddressData({fullName:'', phone:'', address:'', city:'', note:''}); setPendingProduct(null);
+    alert(`Physical Order Placed! Check My Orders`);
   };
 
-  const copyLog = (logText) => {
-    navigator.clipboard.writeText(logText);
-    alert("Copied to clipboard!");
-  };
+  const copyLog = (logText) => { navigator.clipboard.writeText(logText); alert("Copied!"); };
 
   return(
     <div style={{fontFamily:'sans-serif', background:'#f5f5f7', minHeight:'100vh'}}>
@@ -172,15 +153,14 @@ export default function Home(){
         </div>
       </div>
 
-      {/* DEPOSIT MODAL - REAL PAYSTACK */}
       {showDeposit && (
         <div style={{position:'fixed', inset:0, background:'rgba(0,0,0,0.6)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:50, padding:16}}>
           <div style={{background:'white', padding:20, borderRadius:12, width:'100%', maxWidth:360}}>
             <h3 style={{margin:0}}>Real Deposit - Live</h3>
-            <p style={{fontSize:11, color:'green', marginTop:4}}>✓ Live - Money enters your approved Paystack account</p>
-            <input value={email} onChange={e=>setEmail(e.target.value)} placeholder="Email for receipt" style={{width:'100%', padding:12, marginTop:12, borderRadius:8, border:'1px solid #ddd', boxSizing:'border-box'}}/>
-            <input type="number" value={depositAmt} onChange={e=>setDepositAmt(e.target.value)} placeholder="Amount e.g 5000" style={{width:'100%', padding:12, marginTop:8, borderRadius:8, border:'1px solid #ddd', boxSizing:'border-box'}}/>
-            {depositAmt && <div style={{fontSize:11, marginTop:8, background:'#f5f5f7', padding:8, borderRadius:6}}>Pay ₦{depositAmt} - ₦50 fee = <b>₦{Number(depositAmt)-50} credited</b></div>}
+            <p style={{fontSize:11, color:'green'}}>✓ Live Paystack</p>
+            <input value={email} onChange={e=>setEmail(e.target.value)} placeholder="Email" style={{width:'100%', padding:12, marginTop:12, borderRadius:8, border:'1px solid #ddd', boxSizing:'border-box'}}/>
+            <input type="number" value={depositAmt} onChange={e=>setDepositAmt(e.target.value)} placeholder="Amount" style={{width:'100%', padding:12, marginTop:8, borderRadius:8, border:'1px solid #ddd', boxSizing:'border-box'}}/>
+            {depositAmt && <div style={{fontSize:11, marginTop:8, background:'#f5f5f7', padding:8, borderRadius:6}}>Pay ₦{depositAmt} - ₦50 = <b>₦{Number(depositAmt)-50} credited</b></div>}
             <div style={{display:'flex', gap:8, marginTop:12}}>
               <button onClick={handleDeposit} style={{flex:1, background:'black', color:'white', padding:12, borderRadius:8, border:0, fontWeight:800}}>Pay with Paystack</button>
               <button onClick={()=>setShowDeposit(false)} style={{flex:1, background:'#eee', padding:12, borderRadius:8, border:0}}>Cancel</button>
@@ -189,66 +169,37 @@ export default function Home(){
         </div>
       )}
 
-      {/* ADDRESS FORM FOR PHYSICAL */}
       {showAddressForm && (
         <div style={{position:'fixed', inset:0, background:'rgba(0,0,0,0.6)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:60, padding:16}}>
-          <div style={{background:'white', padding:20, borderRadius:12, width:'100%', maxWidth:380, maxHeight:'90vh', overflow:'auto'}}>
-            <h3 style={{margin:0}}>Delivery Details - Physical Item</h3>
-            <p style={{fontSize:11, color:'#666', marginTop:4}}>Buying: {pendingProduct?.product.name} x{pendingProduct?.qty} = ₦{pendingProduct?.total}</p>
+          <div style={{background:'white', padding:20, borderRadius:12, width:'100%', maxWidth:380}}>
+            <h3 style={{margin:0}}>Delivery Details</h3>
+            <p style={{fontSize:11, color:'#666'}}>Buying: {pendingProduct?.product.name} x{pendingProduct?.qty} = ₦{pendingProduct?.total}</p>
             <input value={addressData.fullName} onChange={e=>setAddressData({...addressData, fullName:e.target.value})} placeholder="Full Name" style={{width:'100%', padding:10, marginTop:10, borderRadius:8, border:'1px solid #ddd', boxSizing:'border-box'}}/>
-            <input value={addressData.phone} onChange={e=>setAddressData({...addressData, phone:e.target.value})} placeholder="Phone Number" style={{width:'100%', padding:10, marginTop:8, borderRadius:8, border:'1px solid #ddd', boxSizing:'border-box'}}/>
-            <input value={addressData.address} onChange={e=>setAddressData({...addressData, address:e.target.value})} placeholder="Full Address (Street, Area)" style={{width:'100%', padding:10, marginTop:8, borderRadius:8, border:'1px solid #ddd', boxSizing:'border-box'}}/>
+            <input value={addressData.phone} onChange={e=>setAddressData({...addressData, phone:e.target.value})} placeholder="Phone" style={{width:'100%', padding:10, marginTop:8, borderRadius:8, border:'1px solid #ddd', boxSizing:'border-box'}}/>
+            <input value={addressData.address} onChange={e=>setAddressData({...addressData, address:e.target.value})} placeholder="Full Address" style={{width:'100%', padding:10, marginTop:8, borderRadius:8, border:'1px solid #ddd', boxSizing:'border-box'}}/>
             <input value={addressData.city} onChange={e=>setAddressData({...addressData, city:e.target.value})} placeholder="City / State" style={{width:'100%', padding:10, marginTop:8, borderRadius:8, border:'1px solid #ddd', boxSizing:'border-box'}}/>
-            <textarea value={addressData.note} onChange={e=>setAddressData({...addressData, note:e.target.value})} placeholder="Delivery Note (Optional)" style={{width:'100%', padding:10, marginTop:8, borderRadius:8, border:'1px solid #ddd', boxSizing:'border-box', height:60}}/>
+            <textarea value={addressData.note} onChange={e=>setAddressData({...addressData, note:e.target.value})} placeholder="Note" style={{width:'100%', padding:10, marginTop:8, borderRadius:8, border:'1px solid #ddd', boxSizing:'border-box', height:60}}/>
             <div style={{display:'flex', gap:8, marginTop:12}}>
-              <button onClick={confirmBuyPhysical} style={{flex:1, background:'black', color:'white', padding:12, borderRadius:8, border:0, fontWeight:800}}>Confirm & Pay ₦{pendingProduct?.total}</button>
+              <button onClick={confirmBuyPhysical} style={{flex:1, background:'black', color:'white', padding:12, borderRadius:8, border:0, fontWeight:800}}>Confirm Pay ₦{pendingProduct?.total}</button>
               <button onClick={()=>setShowAddressForm(false)} style={{flex:1, background:'#eee', padding:12, borderRadius:8, border:0}}>Cancel</button>
             </div>
           </div>
         </div>
       )}
 
-      {/* MY ORDERS - WHERE TO COPY ITEMS */}
       {showOrders && (
         <div style={{position:'fixed', inset:0, background:'rgba(0,0,0,0.6)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:70, padding:12}}>
           <div style={{background:'white', padding:16, borderRadius:12, width:'100%', maxWidth:500, maxHeight:'85vh', display:'flex', flexDirection:'column'}}>
-            <div style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
-              <h3 style={{margin:0}}>My Orders / Purchased Items</h3>
-              <button onClick={()=>setShowOrders(false)} style={{background:'#eee', border:0, padding:'6px 10px', borderRadius:6}}>X</button>
-            </div>
+            <div style={{display:'flex', justifyContent:'space-between'}}><h3 style={{margin:0}}>My Orders</h3><button onClick={()=>setShowOrders(false)} style={{background:'#eee', border:0, padding:'6px 10px', borderRadius:6}}>X</button></div>
             <div style={{marginTop:12, overflow:'auto', flex:1}}>
-              {orders.length===0? <div style={{textAlign:'center', color:'#888', padding:20, fontSize:12}}>No purchases yet. Buy something to see it here.</div> :
+              {orders.length===0? <div style={{textAlign:'center', color:'#888', padding:20, fontSize:12}}>No purchases yet</div> :
                 orders.map(order=>(
                   <div key={order.id} style={{border:'1px solid #eee', borderRadius:8, padding:10, marginTop:10, borderLeft:`4px solid ${order.type==='physical'?'#2563eb':'#16a34a'}`}}>
-                    <div style={{display:'flex', gap:10}}>
-                      <img src={order.img} style={{width:50, height:50, borderRadius:6, objectFit:'cover'}}/>
-                      <div style={{flex:1}}>
-                        <div style={{fontWeight:800, fontSize:12}}><span style={{background:order.type==='physical'?'#dbeafe':'#dcfce7', padding:'2px 5px', borderRadius:4, fontSize:9, marginRight:4}}>{order.type.toUpperCase()}</span>{order.productName} x{order.qty}</div>
-                        <div style={{fontSize:11, color:'#666', marginTop:2}}>{order.date} - ₦{order.total}</div>
-                      </div>
-                    </div>
+                    <div style={{display:'flex', gap:10}}><img src={order.img} style={{width:50, height:50, borderRadius:6, objectFit:'cover'}}/><div style={{flex:1}}><div style={{fontWeight:800, fontSize:12}}><span style={{background:order.type==='physical'?'#dbeafe':'#dcfce7', padding:'2px 5px', borderRadius:4, fontSize:9, marginRight:4}}>{order.type.toUpperCase()}</span>{order.productName} x{order.qty}</div><div style={{fontSize:11, color:'#666'}}>{order.date} - ₦{order.total}</div></div></div>
                     {order.type==='digital'? (
-                      <div style={{marginTop:8}}>
-                        {order.logs.map((log, idx)=>(
-                          <div key={idx} style={{background:'#f9fafb', border:'1px solid #ddd', borderRadius:6, padding:8, marginTop:6}}>
-                            <div style={{fontSize:11, fontFamily:'monospace', whiteSpace:'pre-wrap', maxHeight:120, overflow:'auto'}}>{log}</div>
-                            <button onClick={()=>copyLog(log)} style={{marginTop:6, background:'black', color:'white', border:0, padding:'6px 12px', borderRadius:6, fontSize:11, fontWeight:700, width:'100%'}}>Copy This Account</button>
-                          </div>
-                        ))}
-                        <button onClick={()=>copyLog(order.logs.join("\n\n"))} style={{marginTop:8, background:'#16a34a', color:'white', border:0, padding:'8px', borderRadius:6, fontSize:11, fontWeight:700, width:'100%'}}>Copy All {order.qty} Accounts</button>
-                      </div>
+                      <div style={{marginTop:8}}>{order.logs.map((log, idx)=>(<div key={idx} style={{background:'#f9fafb', border:'1px solid #ddd', borderRadius:6, padding:8, marginTop:6}}><div style={{fontSize:11, fontFamily:'monospace', whiteSpace:'pre-wrap'}}>{log}</div><button onClick={()=>copyLog(log)} style={{marginTop:6, background:'black', color:'white', border:0, padding:'6px 12px', borderRadius:6, fontSize:11, width:'100%'}}>Copy This Account</button></div>))}</div>
                     ) : (
-                      <div style={{marginTop:8, background:'#eff6ff', padding:8, borderRadius:6, border:'1px solid #bfdbfe'}}>
-                        <div style={{fontSize:11, fontWeight:700}}>Delivery Details You Filled:</div>
-                        <div style={{fontSize:11, marginTop:4, lineHeight:'16px'}}>
-                          Name: {order.address.fullName}<br/>
-                          Phone: {order.address.phone}<br/>
-                          Address: {order.address.address}<br/>
-                          City: {order.address.city}<br/>
-                          Note: {order.address.note||'None'}<br/>
-                          <div style={{marginTop:6, background:'white', padding:6, borderRadius:4, fontSize:10}}>Status: {order.status}</div>
-                        </div>
-                      </div>
+                      <div style={{marginTop:8, background:'#eff6ff', padding:8, borderRadius:6}}><div style={{fontSize:11, fontWeight:700}}>Delivery Details:</div><div style={{fontSize:11, marginTop:4}}>Name: {order.address.fullName}<br/>Phone: {order.address.phone}<br/>Address: {order.address.address}<br/>City: {order.address.city}</div></div>
                     )}
                   </div>
                 ))
@@ -258,24 +209,28 @@ export default function Home(){
         </div>
       )}
 
-      {/* PRODUCTS GRID - OLD SETUP STILL */}
       <div style={{padding:16, display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(160px, 1fr))', gap:12}}>
-        {products.map(p=>(
-          <div key={p.id} style={{background:'white', borderRadius:12, overflow:'hidden', border:'1px solid #eee', borderLeft:`4px solid ${p.type==='physical'?'#2563eb':'#16a34a'}`}}>
+        {products.map(p=>{
+          const available = p.type==='digital'? (p.logs?.length||0) : p.stock;
+          const currentQty = qtys[p.id]||1;
+          const isOut = available <=0;
+          return(
+          <div key={p.id} style={{background:'white', borderRadius:12, overflow:'hidden', border:'1px solid #eee', borderLeft:`4px solid ${p.type==='physical'?'#2563eb':'#16a34a'}`, opacity: isOut? 0.6 : 1}}>
             <img src={p.img} style={{width:'100%', height:140, objectFit:'cover'}}/>
             <div style={{padding:10}}>
               <div style={{fontWeight:700, fontSize:12}}>{p.name}</div>
-              <div style={{fontSize:12, marginTop:4}}><b>₦{p.price}</b> {p.oldPrice && <s style={{color:'#999', fontSize:10}}>₦{p.oldPrice}</s>}</div>
-              <div style={{fontSize:10, color: p.stock<3? 'red' : 'green'}}>{p.type==='digital'?`Stock: ${p.logs?.length||p.stock} logs`:`Stock: ${p.stock}`} - {p.type?.toUpperCase()}</div>
+              <div style={{fontSize:12, marginTop:4}}><b>₦{p.price}</b></div>
+              <div style={{fontSize:10, color: available<3? 'red' : 'green', fontWeight:700}}>{isOut? 'SOLD OUT' : `Available: ${available}`} - {p.type?.toUpperCase()}</div>
               <div style={{display:'flex', alignItems:'center', gap:8, marginTop:8, justifyContent:'center', background:'#f5f5f7', borderRadius:6, padding:4}}>
-                <button onClick={()=>changeQty(p.id,-1)} style={{border:0, background:'white', width:26, height:26, borderRadius:4}}>-</button>
-                <span style={{fontSize:12, fontWeight:700}}>{qtys[p.id]||1}</span>
-                <button onClick={()=>changeQty(p.id,1)} style={{border:0, background:'white', width:26, height:26, borderRadius:4}}>+</button>
+                <button onClick={()=>changeQty(p.id,-1)} disabled={isOut} style={{border:0, background:'white', width:26, height:26, borderRadius:4, opacity: isOut?0.3:1}}>-</button>
+                <span style={{fontSize:12, fontWeight:700}}>{isOut?0:currentQty}/{available}</span>
+                <button onClick={()=>changeQty(p.id,1)} disabled={isOut || currentQty>=available} style={{border:0, background: currentQty>=available? '#fecaca':'white', width:26, height:26, borderRadius:4}}>+</button>
               </div>
-              <button onClick={()=>startBuy(p)} style={{width:'100%', marginTop:8, background:'black', color:'white', border:0, padding:10, borderRadius:6, fontSize:12, fontWeight:800}}>{p.type==='physical'?'Buy & Enter Address':'Buy Now'}</button>
+              <button onClick={()=>startBuy(p)} disabled={isOut} style={{width:'100%', marginTop:8, background: isOut? '#ccc':'black', color:'white', border:0, padding:10, borderRadius:6, fontSize:12, fontWeight:800}}>{isOut? 'Sold Out' : (p.type==='physical'?'Buy & Enter Address':'Buy Now')}</button>
+              {currentQty>=available &&!isOut && <div style={{fontSize:9, color:'red', textAlign:'center', marginTop:4}}>Max available reached!</div>}
             </div>
           </div>
-        ))}
+        )})}
       </div>
     </div>
   );
