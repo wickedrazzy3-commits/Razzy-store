@@ -12,6 +12,10 @@ export default function Home(){
   const [wallet, setWallet] = useState(0);
   const [showDeposit, setShowDeposit] = useState(false);
   const [depositAmt, setDepositAmt] = useState('');
+  // DASHBOARD STATS
+  const [totalDeposited, setTotalDeposited] = useState(0);
+  const [totalUsed, setTotalUsed] = useState(0);
+  const [totalItems, setTotalItems] = useState(0);
 
   useEffect(()=>{
     try{
@@ -19,11 +23,20 @@ export default function Home(){
       if(s){ const p=JSON.parse(s); if(Array.isArray(p)&&p.length>0) setProducts(p); }
       const w = localStorage.getItem("razzy_wallet");
       if(w) setWallet(Number(w)||0);
+      const td = localStorage.getItem("razzy_totalDeposited");
+      if(td) setTotalDeposited(Number(td)||0);
+      const tu = localStorage.getItem("razzy_totalUsed");
+      if(tu) setTotalUsed(Number(tu)||0);
+      const ti = localStorage.getItem("razzy_totalItems");
+      if(ti) setTotalItems(Number(ti)||0);
     }catch{}
   },[]);
 
   useEffect(()=>{ try{ localStorage.setItem("razzy_products", JSON.stringify(products)); }catch{} },[products]);
   useEffect(()=>{ try{ localStorage.setItem("razzy_wallet", String(wallet)); }catch{} },[wallet]);
+  useEffect(()=>{ try{ localStorage.setItem("razzy_totalDeposited", String(totalDeposited)); }catch{} },[totalDeposited]);
+  useEffect(()=>{ try{ localStorage.setItem("razzy_totalUsed", String(totalUsed)); }catch{} },[totalUsed]);
+  useEffect(()=>{ try{ localStorage.setItem("razzy_totalItems", String(totalItems)); }catch{} },[totalItems]);
 
   const changeQty = (id, delta) => {
     setQtys(prev=>{
@@ -36,11 +49,14 @@ export default function Home(){
   const handleDeposit = () => {
     const amt = Number(depositAmt);
     if(!amt || amt < 100) return alert("Enter minimum ₦100");
-    // HERE you will put Paystack inline later. For now it adds directly after "payment"
-    setWallet(prev=>prev+amt);
+    const FEE = 50;
+    if(amt <= FEE) return alert(`Minimum deposit is ₦${FEE+50} because ₦${FEE} fee`);
+    const credit = amt - FEE;
+    setWallet(prev=>prev+credit);
+    setTotalDeposited(prev=>prev+amt);
     setDepositAmt('');
     setShowDeposit(false);
-    alert(`Deposit Successful! ₦${amt} added to wallet`);
+    alert(`Deposit Successful! You paid ₦${amt} - ₦${FEE} fee = ₦${credit} added to wallet`);
   };
 
   const handleBuy = async (product) => {
@@ -52,8 +68,10 @@ export default function Home(){
     if(!confirm(`Buy ${product.name} x${qty} = ₦${total}?\nBalance after: ₦${wallet-total}`)) return;
 
     setWallet(prev=>prev-total);
+    setTotalUsed(prev=>prev+total);
+    setTotalItems(prev=>prev+qty);
     setProducts(prev=>prev.map(p=>p.id===product.id?{...p, stock: p.stock - qty}:p));
-    alert(`Purchase Successful!\n${product.name}\n${product.delivery}\nWallet Balance: ₦${wallet-total}`);
+    alert(`Purchase Successful!\n${product.name} x${qty}\n${product.delivery}\nWallet Balance: ₦${wallet-total}`);
   };
 
   return(
@@ -67,24 +85,43 @@ export default function Home(){
         </div>
       </div>
 
+      {/* DASHBOARD - Restored */}
+      <div style={{padding:12}}>
+        <div style={{background:'white', borderRadius:12, padding:12, display:'grid', gridTemplateColumns:'repeat(3, 1fr)', gap:10, border:'1px solid #eee'}}>
+          <div style={{background:'#f0fdf4', borderRadius:8, padding:10, textAlign:'center'}}>
+            <div style={{fontSize:10, color:'#666', fontWeight:700}}>TOTAL DEPOSITED</div>
+            <div style={{fontSize:14, fontWeight:900, color:'#16a34a', marginTop:4}}>₦{totalDeposited}</div>
+          </div>
+          <div style={{background:'#fef2f2', borderRadius:8, padding:10, textAlign:'center'}}>
+            <div style={{fontSize:10, color:'#666', fontWeight:700}}>TOTAL USED</div>
+            <div style={{fontSize:14, fontWeight:900, color:'#dc2626', marginTop:4}}>₦{totalUsed}</div>
+          </div>
+          <div style={{background:'#eff6ff', borderRadius:8, padding:10, textAlign:'center'}}>
+            <div style={{fontSize:10, color:'#666', fontWeight:700}}>ITEMS BOUGHT</div>
+            <div style={{fontSize:14, fontWeight:900, color:'#2563eb', marginTop:4}}>{totalItems}</div>
+          </div>
+        </div>
+        <div style={{fontSize:10, color:'#888', textAlign:'center', marginTop:6}}>₦50 fee charged on each deposit</div>
+      </div>
+
       {/* DEPOSIT MODAL */}
       {showDeposit && (
         <div style={{position:'fixed', inset:0, background:'rgba(0,0,0,0.6)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:50, padding:16}}>
           <div style={{background:'white', padding:20, borderRadius:12, width:'100%', maxWidth:340}}>
             <h3 style={{margin:0}}>Deposit to Wallet</h3>
-            <p style={{fontSize:12, color:'#666'}}>You must deposit before you can buy. Deposit with Paystack.</p>
+            <p style={{fontSize:12, color:'#666'}}>₦50 charges on every deposit. Example: Pay ₦5000 → Get ₦4950</p>
             <input type="number" value={depositAmt} onChange={e=>setDepositAmt(e.target.value)} placeholder="Amount e.g 5000" style={{width:'100%', padding:12, marginTop:12, borderRadius:8, border:'1px solid #ddd', boxSizing:'border-box'}}/>
+            {depositAmt && <div style={{fontSize:11, marginTop:8, background:'#f5f5f7', padding:8, borderRadius:6}}>You pay ₦{depositAmt} - ₦50 fee = <b>₦{Number(depositAmt)-50}</b> credited</div>}
             <div style={{display:'flex', gap:8, marginTop:12}}>
               <button onClick={handleDeposit} style={{flex:1, background:'black', color:'white', padding:12, borderRadius:8, border:0, fontWeight:800}}>Pay with Paystack</button>
               <button onClick={()=>setShowDeposit(false)} style={{flex:1, background:'#eee', padding:12, borderRadius:8, border:0}}>Cancel</button>
             </div>
-            <p style={{fontSize:10, color:'#888', marginTop:10}}>Test mode: Money adds instantly. When you add real Paystack, replace handleDeposit with Paystack popup.</p>
           </div>
         </div>
       )}
 
       {/* PRODUCTS */}
-      <div style={{padding:16, display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(160px, 1fr))', gap:12}}>
+      <div style={{padding:16, paddingTop:0, display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(160px, 1fr))', gap:12}}>
         {products.map(p=>(
           <div key={p.id} style={{background:'white', borderRadius:12, overflow:'hidden', border:'1px solid #eee'}}>
             <img src={p.img} style={{width:'100%', height:140, objectFit:'cover', background:'#fff'}}/>
@@ -100,7 +137,6 @@ export default function Home(){
               </div>
 
               <button onClick={()=>handleBuy(p)} style={{width:'100%', marginTop:8, background:'black', color:'white', border:0, padding:10, borderRadius:6, fontSize:12, fontWeight:800}}>Buy Now</button>
-              <div style={{fontSize:9, color:'#888', marginTop:4, textAlign:'center'}}>Wallet must have ₦{p.price*(qtys[p.id]||1)}</div>
             </div>
           </div>
         ))}
