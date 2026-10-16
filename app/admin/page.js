@@ -66,4 +66,52 @@ export default function Home() {
 
   return (
     <>
-    <style>{`body{margin:0;font-family:-apple-system,sans-serif;background:#f5f5f7}.header{
+    <style>{`body{margin:0;font-family:-apple-system,sans-serif;background:#f5f5f7}.header{position:sticky;top:0;background:white;border-bottom:1px solid #eee;padding:12px 14px;display:flex;justify-content:space-between;align-items:center;z-index:5}.grid{max-width:1100px;margin:12px auto;padding:0 12px;display:grid;grid-template-columns:1fr 1fr;gap:10px} @media(min-width:700px){.grid{grid-template-columns:1fr 1fr 1fr 1fr}}.card2{background:white;border-radius:14px;overflow:hidden;border:1px solid #eee}.img{width:100%;height:130px;object-fit:cover}.qtyBox{display:flex;align-items:center;gap:8px;background:#f6f6f7;border-radius:999px;padding:3px 8px;margin-top:8px;width:fit-content}.qtyBtn{width:26px;height:26px;border-radius:999px;border:1px solid #ddd;background:white;font-weight:800;cursor:pointer}.supportBtn{position:fixed;bottom:20px;right:20px;background:#25D366;color:white;border:0;width:56px;height:56px;border-radius:999px;font-size:28px;box-shadow:0 4px 12px rgba(0,0,0,0.2);cursor:pointer;z-index:50}`}</style>
+
+    <div className="header"><div style={{fontWeight:900}}>RAZZY STORE</div><div style={{display:'flex',gap:6}}><a href="/admin" style={{background:'#f0f0f0',padding:'6px 12px',borderRadius:999,fontSize:11,textDecoration:'none',color:'black',fontWeight:700}}>Admin</a><button onClick={()=>supabase.auth.signOut()} style={{background:'#eee',border:0,padding:'6px 12px',borderRadius:999,fontSize:11}}>Logout</button></div></div>
+
+    <div className="grid">
+      {products.map(p=>(
+        <div key={p.id} className="card2">
+          <img src={p.img} className="img"/>
+          <div style={{padding:10}}>
+            <div style={{fontWeight:700,fontSize:13,lineHeight:'15px',height:30,overflow:'hidden'}}>{p.name}</div>
+            <div style={{display:'flex',alignItems:'center',gap:6,marginTop:4}}><span style={{fontWeight:900,fontSize:14}}>₦{p.price.toLocaleString()}</span>{p.oldPrice>p.price && <span style={{fontSize:10,textDecoration:'line-through',color:'#999'}}>₦{p.oldPrice.toLocaleString()}</span>}</div>
+
+            {/* QTY SELECTOR - HERE */}
+            <div className="qtyBox">
+              <button className="qtyBtn" onClick={()=>changeQty(p.id,-1)}>-</button>
+              <span style={{fontWeight:800,fontSize:13,minWidth:18,textAlign:'center'}}>{qtys[p.id]||1}</span>
+              <button className="qtyBtn" onClick={()=>changeQty(p.id,1)}>+</button>
+              <span style={{fontSize:10,color:'#888',marginLeft:4}}>Qty</span>
+            </div>
+
+            <button disabled={paying===p.id} onClick={()=>handlePay(p)} style={{width:'100%',marginTop:8,background:paying===p.id?'#999':'black',color:'white',border:0,padding:'10px',borderRadius:999,fontWeight:800,fontSize:12,cursor:'pointer'}}>
+              {paying===p.id?'Processing...':`Pay ₦${(p.price*(qtys[p.id]||1)).toLocaleString()} & Get Now`}
+            </button>
+            <div style={{fontSize:9,color:'#666',textAlign:'center',marginTop:4}}>{p.type==='digital'?'✓ Instant delivery in site':'✓ Tracking in site'}</div>
+          </div>
+        </div>
+      ))}
+    </div>
+
+    {orders.length>0 && (
+      <div style={{maxWidth:1100,margin:'20px auto',padding:'0 12px'}}>
+        <h3 style={{fontWeight:900,fontSize:15}}>My Purchases</h3>
+        {orders.map(o=><div key={o.id} style={{background:'white',borderRadius:12,padding:10,marginTop:8,border:'1px solid #eee'}}><b style={{fontSize:12}}>{o.product}</b> - ₦{o.price.toLocaleString()}<div style={{fontSize:11,marginTop:4,background:'#f8f9ff',padding:6,borderRadius:6,whiteSpace:'pre-wrap'}}>{o.deliveryInfo}</div></div>)}
+      </div>
+    )}
+
+    {activeDelivery && (
+      <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',display:'flex',alignItems:'center',justifyContent:'center',padding:20,zIndex:100}} onClick={()=>setActiveDelivery(null)}>
+        <div style={{background:'white',width:'100%',maxWidth:380,borderRadius:20,padding:20}} onClick={e=>e.stopPropagation()}>
+          <div style={{textAlign:'center',fontSize:36}}>✅</div><h3 style={{textAlign:'center',fontWeight:900}}>Payment Successful!</h3><p style={{textAlign:'center',fontSize:12,color:'#666'}}>{activeDelivery.qty>1?`${activeDelivery.qty} items delivered:`:'Your item delivered:'}</p>
+          <div style={{background:'#f0fdf4',border:'2px dashed #ccc',borderRadius:10,padding:10,marginTop:10,fontSize:11,whiteSpace:'pre-wrap'}}>{activeDelivery.deliveryInfo}</div>
+          <button onClick={()=>setActiveDelivery(null)} style={{width:'100%',marginTop:12,background:'black',color:'white',border:0,padding:12,borderRadius:999,fontWeight:800}}>Done</button>
+        </div>
+      </div>
+    )}
+    <a href="https://wa.me/2348100000000?text=Hi Razzy Support" target="_blank" className="supportBtn">💬</a>
+    </>
+  );
+}
