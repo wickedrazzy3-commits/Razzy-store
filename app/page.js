@@ -72,7 +72,7 @@ export default function Home(){
     if(!amt) return;
     if(typeof window.PaystackPop === 'undefined'){ alert('Wait 2 sec for Paystack'); return; }
     const handler = window.PaystackPop.setup({
-      key: 'pk_test_xxxxxxxxxxxxxxxx',
+      key: 'pk_live_e53e702112a6a9d3e7d5b7b6f1a2b3c4d5e6f7g8h9',
       email: user.email,
       amount: amt*100,
       currency: 'NGN',
@@ -115,7 +115,7 @@ export default function Home(){
       setProducts(products.map(function(p){ return p.id===product.id ? {...p, logs: p.type==='digital'? p.logs.slice(qty) : p.logs, stock: p.type==='digital'? p.logs.length-qty : p.stock-qty } : p; }));
       let receipt = 'RAZZY RECEIPT User:' + user.email + ' Ref:' + ref + ' ' + product.name + ' x' + qty + ' = N' + total;
       if(delivered) receipt += ' LOGS:' + delivered.substring(0,200);
-      const wa = 'https://wa.me/2349034567890?text=' + encodeURIComponent(receipt);
+      const wa = 'https://wa.me/2349061213237?text=' + encodeURIComponent(receipt);
       window.open(wa, '_blank');
       alert('Success! Check Dashboard and WhatsApp');
     };
@@ -125,7 +125,7 @@ export default function Home(){
     }else{
       if(typeof window.PaystackPop === 'undefined'){ alert('Wait for Paystack'); return; }
       const h = window.PaystackPop.setup({
-        key: 'pk_test_xxxxxxxxxxxxxxxx',
+        key: 'pk_live_e53e702112a6a9d3e7d5b7b6f1a2b3c4d5e6f7g8h9',
         email: user.email,
         amount: total*100,
         currency: 'NGN',
