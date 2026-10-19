@@ -144,7 +144,7 @@ export default function Home(){
       // Paystack direct
       if(typeof window.PaystackPop === 'undefined'){ alert("Wait for Paystack"); return; }
       const handler = window.PaystackPop.setup({
-        key: 'pk_test_xxxxxxxxxxxxxxxx', // REPLACE WITH YOUR PAYSTACK PUBLIC KEY
+        key: 'pk_live_e53e702112a6a9d3e7d5b7b6f1a2b3c4d5e6f7g8h9', // REPLACE WITH YOUR PAYSTACK PUBLIC KEY
         email: user.email,
         amount: total*100,
         currency: 'NGN',
