@@ -133,7 +133,7 @@ export default function Home(){
       // WhatsApp receipt
       let receipt = `RAZZY STORE RECEIPT\nUser: ${user.email}\nRef: ${reference||'WALLET'}\n\n${product.name} x${qty} = ₦${total}\n`;
       if(deliveredLogs) receipt += `\nYOUR LOGS:\n${deliveredLogs}\n`;
-      const wa = `https://wa.me/2349034567890?text=${encodeURIComponent(receipt)}`; // REPLACE WA NUMBER
+      const wa = `https://wa.me/2349061213237?text=${encodeURIComponent(receipt)}`; // REPLACE WA NUMBER
       window.open(wa, '_blank');
       alert(`Success! Order saved to dashboard. Logs sent to WhatsApp`);
     };
