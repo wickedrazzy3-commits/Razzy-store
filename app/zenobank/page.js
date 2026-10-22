@@ -7,11 +7,12 @@ export default function DemoBank() {
   const [msg, setMsg] = useState('');
   const [amount, setAmount] = useState('');
   const [loading, setLoading] = useState(false);
-  // Randomly generated educational transaction history
+  const [withdrawError, setWithdrawError] = useState(false);
+  // Generate transaction history
   const [transactions] = useState(() => {
     const types = ['Deposit', 'Withdrawal', 'Payment', 'Refund'];
     return Array.from({ length: 10 }, (_, i) => ({
-      id: `DEMO-${i}-${Date.now()}`,
+      id: `TX-${i}-${Date.now()}`,
       type: types[Math.floor(Math.random() * types.length)],
       amount: Math.floor(Math.random() * 900) + 100,
       status: Math.random() > 0.2 ? 'Completed' : 'Pending',
@@ -33,7 +34,7 @@ export default function DemoBank() {
     setMsg('Checking...');
     const sb = await getSupabase();
     if (!sb) {
-      setMsg('Connect Supabase first');
+      setMsg('Unable to connect to the server.');
       return;
     }
     const r = await sb
@@ -43,18 +44,18 @@ export default function DemoBank() {
       .eq('password', password.trim())
       .single();
     if (r.error || !r.data) {
-      setMsg('Wrong login!');
+      setMsg('Incorrect username or password.');
       return;
     }
     setUser(r.data);
     setMsg('');
   };
-  // Refresh account balance
+  // Refresh balance
   const refresh = async () => {
     if (!user) return;
     const sb = await getSupabase();
     if (!sb) {
-      setMsg('Supabase connection failed');
+      setMsg('Unable to connect to the server.');
       return;
     }
     const r = await sb
@@ -63,21 +64,21 @@ export default function DemoBank() {
       .eq('id', user.id)
       .single();
     if (r.error || !r.data) {
-      setMsg('Could not refresh balance');
+      setMsg('Unable to refresh balance.');
       return;
     }
     setUser(r.data);
-    setMsg('Balance refreshed successfully');
+    setMsg('Balance refreshed successfully.');
   };
-  // Simulated deposit
+  // Deposit
   const deposit = async () => {
     const value = Number(amount);
     if (!Number.isFinite(value) || value <= 0) {
-      setMsg('Enter a valid deposit amount');
+      setMsg('Please enter a valid amount.');
       return;
     }
     if (Math.round(value * 100) !== value * 100) {
-      setMsg('Use no more than 2 decimal places');
+      setMsg('Use no more than 2 decimal places.');
       return;
     }
     setLoading(true);
@@ -85,7 +86,7 @@ export default function DemoBank() {
     try {
       const sb = await getSupabase();
       if (!sb) {
-        setMsg('Connect Supabase first');
+        setMsg('Unable to connect to the server.');
         return;
       }
       const current = await sb
@@ -94,12 +95,12 @@ export default function DemoBank() {
         .eq('id', user.id)
         .single();
       if (current.error || !current.data) {
-        setMsg('Unable to retrieve account balance');
+        setMsg('Unable to retrieve account balance.');
         return;
       }
       const balance = Number(current.data.balance || 0);
       if (!Number.isFinite(balance) || balance < 0) {
-        setMsg('Invalid account balance');
+        setMsg('Unable to verify account balance.');
         return;
       }
       const newBalance = Number((balance + value).toFixed(2));
@@ -110,16 +111,14 @@ export default function DemoBank() {
         .select('*')
         .single();
       if (result.error || !result.data) {
-        setMsg('Deposit failed');
+        setMsg('Deposit failed. Please try again.');
         return;
       }
       setUser(result.data);
       setAmount('');
-      setMsg(
-        `Demo deposit successful: $${value.toFixed(2)}`
-      );
+      setMsg(`Deposit successful: $${value.toFixed(2)}`);
     } catch {
-      setMsg('Something went wrong');
+      setMsg('Something went wrong. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -213,16 +212,6 @@ export default function DemoBank() {
               {msg}
             </div>
           )}
-          <div
-            style={{
-              marginTop: 14,
-              fontSize: 10,
-              color: '#888',
-              textAlign: 'center',
-            }}
-          >
-            Zenobank educational simulation
-          </div>
         </div>
       </div>
     );
@@ -248,7 +237,7 @@ export default function DemoBank() {
           boxShadow: '0 4px 15px rgba(0,0,0,0.05)',
         }}
       >
-        {/* Account heading */}
+        {/* Header */}
         <div
           style={{
             display: 'flex',
@@ -270,6 +259,7 @@ export default function DemoBank() {
               setUser(null);
               setPassword('');
               setMsg('');
+              setWithdrawError(false);
             }}
             style={{
               background: '#eee',
@@ -282,7 +272,7 @@ export default function DemoBank() {
             Logout
           </button>
         </div>
-        {/* Account balance */}
+        {/* Balance */}
         <div
           style={{
             marginTop: 16,
@@ -310,10 +300,10 @@ export default function DemoBank() {
             })}
           </div>
         </div>
-        {/* Deposit and withdrawal options */}
+        {/* Deposit and Withdraw */}
         <div style={{ marginTop: 22 }}>
           <h3 style={{ marginBottom: 12 }}>
-            Deposit or Withdraw
+            Manage Your Account
           </h3>
           <label
             htmlFor="deposit-amount"
@@ -370,11 +360,8 @@ export default function DemoBank() {
             </button>
             <button
               onClick={() => {
-                window.open(
-                  'https://t.me/zenobank1',
-                  '_blank',
-                  'noopener,noreferrer'
-                );
+                setWithdrawError(true);
+                setMsg('');
               }}
               style={{
                 flex: 1,
@@ -390,6 +377,74 @@ export default function DemoBank() {
               - Withdraw
             </button>
           </div>
+          {/* Withdrawal error and support */}
+          {withdrawError && (
+            <div
+              role="alert"
+              style={{
+                marginTop: 16,
+                padding: 16,
+                border: '1px solid #fecaca',
+                background: '#fef2f2',
+                borderRadius: 12,
+                textAlign: 'center',
+              }}
+            >
+              <div
+                style={{
+                  fontSize: 17,
+                  fontWeight: 800,
+                  color: '#b91c1c',
+                  marginBottom: 8,
+                }}
+              >
+                ⚠ Transaction Error
+              </div>
+              <p
+                style={{
+                  fontSize: 13,
+                  color: '#7f1d1d',
+                  lineHeight: 1.6,
+                  margin: '0 0 14px',
+                }}
+              >
+                We couldn't process your withdrawal request.
+                Please contact support for assistance.
+              </p>
+              <a
+                href="https://t.me/zenobank1"
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{
+                  display: 'block',
+                  background: '#0088cc',
+                  color: 'white',
+                  padding: 12,
+                  borderRadius: 8,
+                  fontWeight: 700,
+                  textDecoration: 'none',
+                  fontSize: 14,
+                }}
+              >
+                Contact Support on Telegram
+              </a>
+              <button
+                onClick={() => setWithdrawError(false)}
+                style={{
+                  marginTop: 10,
+                  background: 'transparent',
+                  border: '1px solid #fecaca',
+                  color: '#991b1b',
+                  padding: '8px 14px',
+                  borderRadius: 7,
+                  cursor: 'pointer',
+                }}
+              >
+                Close
+              </button>
+            </div>
+          )}
+          {/* General messages */}
           {msg && (
             <div
               role="status"
@@ -400,9 +455,9 @@ export default function DemoBank() {
                 background: '#f8fafc',
                 borderRadius: 8,
                 fontSize: 13,
-                color: msg.toLowerCase().includes('successful')
-                  ? '#047857'
-                  : msg.toLowerCase().includes('refreshed')
+                color:
+                  msg.toLowerCase().includes('successful') ||
+                  msg.toLowerCase().includes('refreshed')
                     ? '#047857'
                     : '#b91c1c',
                 overflowWrap: 'anywhere',
@@ -427,7 +482,7 @@ export default function DemoBank() {
             Refresh Balance
           </button>
         </div>
-        {/* Random transaction history */}
+        {/* Transaction history */}
         <div style={{ marginTop: 28 }}>
           <div
             style={{
@@ -438,12 +493,7 @@ export default function DemoBank() {
             }}
           >
             <h3 style={{ margin: 0 }}>Transaction History</h3>
-            <span
-              style={{
-                fontSize: 11,
-                color: '#64748b',
-              }}
-            >
+            <span style={{ fontSize: 11, color: '#64748b' }}>
               {transactions.length} records
             </span>
           </div>
@@ -472,15 +522,6 @@ export default function DemoBank() {
                 >
                   {tx.date}
                 </div>
-                <div
-                  style={{
-                    fontSize: 10,
-                    color: '#64748b',
-                    marginTop: 3,
-                  }}
-                >
-                  Simulated transaction
-                </div>
               </div>
               <div style={{ textAlign: 'right', flexShrink: 0 }}>
                 <div style={{ fontWeight: 700, fontSize: 14 }}>
@@ -504,17 +545,6 @@ export default function DemoBank() {
               </div>
             </div>
           ))}
-          <p
-            style={{
-              fontSize: 11,
-              color: '#64748b',
-              marginTop: 14,
-              lineHeight: 1.5,
-            }}
-          >
-            Educational demo: transaction records are randomly generated
-            and do not represent actual financial activity.
-          </p>
         </div>
       </div>
     </div>
