@@ -472,3 +472,51 @@ export default function DemoBank() {
                 >
                   {tx.date}
                 </div>
+                <div
+                  style={{
+                    fontSize: 10,
+                    color: '#64748b',
+                    marginTop: 3,
+                  }}
+                >
+                  Simulated transaction
+                </div>
+              </div>
+              <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                <div style={{ fontWeight: 700, fontSize: 14 }}>
+                  ${tx.amount.toLocaleString('en-US', {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}
+                </div>
+                <div
+                  style={{
+                    fontSize: 11,
+                    marginTop: 4,
+                    color:
+                      tx.status === 'Completed'
+                        ? '#059669'
+                        : '#d97706',
+                  }}
+                >
+                  {tx.status}
+                </div>
+              </div>
+            </div>
+          ))}
+          <p
+            style={{
+              fontSize: 11,
+              color: '#64748b',
+              marginTop: 14,
+              lineHeight: 1.5,
+            }}
+          >
+            Educational demo: transaction records are randomly generated
+            and do not represent actual financial activity.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
