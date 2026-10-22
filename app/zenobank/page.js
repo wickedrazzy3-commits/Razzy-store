@@ -54,7 +54,7 @@ export default function DemoBank(){
         </div>
         <div style={{marginTop:16, background:'#0f172a', color:'white', padding:16, borderRadius:12}}>
           <div style={{fontSize:12, opacity:0.7}}>BALANCE</div>
-          <div style={{fontSize:28, fontWeight:800}}>₦{user.balance?.toLocaleString()}</div>
+          <div style={{fontSize:28, fontWeight:800}}>${user.balance?.toLocaleString()}</div>
         </div>
         <button onClick={refresh} style={{width:'100%', marginTop:12, padding:10, borderRadius:8, border:'1px solid #ddd', background:'white'}}>Refresh</button>
       </div>
